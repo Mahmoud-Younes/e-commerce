@@ -34,6 +34,19 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+  flutter_bloc: ^9.1.1
+  get_it: ^9.3.0
+  flutter_screenutil: ^5.9.3
+  cached_network_image: ^4.0.6
+  firebase_core: ^5.1.0
+  firebase_auth: ^7.0.1
+  cloud_firestore: ^7.1.0
+  firebase_messaging: ^17.0.1
+  supabase_flutter: ^2.18.3
+  image_picker: ^1.2.4
+  intl: ^0.20.3
+  freezed_annotation: ^3.1.0
+  json_annotation: ^4.12.0
 
 dev_dependencies:
   flutter_test:
@@ -45,6 +58,23 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  freezed: ^4.0.3
+  build_runner: ^2.17.1
+  json_serializable: ^6.15.2
+
+  # Auth/feature test stack (Phase 1 test agent).
+  mocktail: ^1.0.4
+  bloc_test: ^10.0.0
+  fake_cloud_firestore: ^4.5.0
+  firebase_auth_mocks: ^0.16.0
+
+# bloc_test pulls in `test`, whose only flutter_test-compatible release
+# (test 1.31.1 for test_api 0.7.12 pinned by the Flutter SDK) declares
+# analyzer <14, clashing with freezed's analyzer >=14. `flutter test` never
+# runs the analyzer at runtime, so the constraint is bypassed here.
+dependency_overrides:
+  test: 1.31.1
+  analyzer: ">=14.0.0 <15.0.0"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

@@ -9,6 +9,67 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    // ================= ORDER MONEY VALIDATION (PRD §9) ========================
+    // Customers cannot change product prices or trusted order totals: every
+    // order line's price is re-checked against its live products/{productId}
+    // doc (FirestorePaths.products), quantities must be positive integers, and
+    // `totalPrice` is recomputed here — the request's own total is never
+    // trusted.
+
+    /// One order line is trustworthy only when its quantity is a positive
+    /// integer and its price equals the catalog price of its product.
+    function orderItemValid(item) {
+      return item.price is number &&
+        item.quantity is int &&
+        item.quantity >= 1 &&
+        get(/databases/$(database)/documents/products/$(item.productId)).data.price == item.price;
+    }
+
+    // Rules forbid recursion and function call depth is capped, so the
+    // per-line checks and the total are unrolled over the first 10 lines —
+    // the exact size cap the /orders create rule enforces, sized to the
+    // per-request get() budget (10) with one products get() per line.
+
+    function orderItemsValidLow(items) {
+      let v0 = items.size() >= 1 ? orderItemValid(items[0]) : true;
+      let v1 = items.size() >= 2 ? orderItemValid(items[1]) : true;
+      let v2 = items.size() >= 3 ? orderItemValid(items[2]) : true;
+      let v3 = items.size() >= 4 ? orderItemValid(items[3]) : true;
+      let v4 = items.size() >= 5 ? orderItemValid(items[4]) : true;
+      return v0 && v1 && v2 && v3 && v4;
+    }
+
+    function orderItemsValidHigh(items) {
+      let v5 = items.size() >= 6 ? orderItemValid(items[5]) : true;
+      let v6 = items.size() >= 7 ? orderItemValid(items[6]) : true;
+      let v7 = items.size() >= 8 ? orderItemValid(items[7]) : true;
+      let v8 = items.size() >= 9 ? orderItemValid(items[8]) : true;
+      let v9 = items.size() >= 10 ? orderItemValid(items[9]) : true;
+      return v5 && v6 && v7 && v8 && v9;
+    }
+
+    function orderItemsValid(items) {
+      return orderItemsValidLow(items) && orderItemsValidHigh(items);
+    }
+
+    // Accumulates price * quantity left-to-right — the same fold order the
+    // app uses (CheckoutCubit._totalOf via CartItemModel.subtotal), so the
+    // recomputed total is bit-identical to the client's and the strict
+    // equality below cannot reject a legitimate order on rounding.
+    function orderTotal(items) {
+      let a0 = items.size() >= 1 ? items[0].price * items[0].quantity : 0;
+      let a1 = a0 + (items.size() >= 2 ? items[1].price * items[1].quantity : 0);
+      let a2 = a1 + (items.size() >= 3 ? items[2].price * items[2].quantity : 0);
+      let a3 = a2 + (items.size() >= 4 ? items[3].price * items[3].quantity : 0);
+      let a4 = a3 + (items.size() >= 5 ? items[4].price * items[4].quantity : 0);
+      let a5 = a4 + (items.size() >= 6 ? items[5].price * items[5].quantity : 0);
+      let a6 = a5 + (items.size() >= 7 ? items[6].price * items[6].quantity : 0);
+      let a7 = a6 + (items.size() >= 8 ? items[7].price * items[7].quantity : 0);
+      let a8 = a7 + (items.size() >= 9 ? items[8].price * items[8].quantity : 0);
+      let a9 = a8 + (items.size() >= 10 ? items[9].price * items[9].quantity : 0);
+      return a9;
+    }
+
     match /users/{uid} {
       allow read: if isOwner(uid) || isAdmin();
       allow create: if isOwner(uid) && request.resource.data.role == 'customer';
@@ -33,9 +94,20 @@ service cloud.firestore {
     match /orders/{orderId} {
       allow read: if isSignedIn() &&
         (resource.data.userId == request.auth.uid || isAdmin());
+      // PRD §9: prices and totals are validated, not trusted from the client.
+      // Every line is re-priced against its products/{productId} doc, and
+      // `totalPrice` must equal the recomputed sum. The 10-line cap matches
+      // the unrolled helpers above (one products get() per line = the
+      // per-request get() budget for a single-document write).
       allow create: if isSignedIn() &&
         request.resource.data.userId == request.auth.uid &&
-        request.resource.data.status == 'pending';
+        request.resource.data.status == 'pending' &&
+        request.resource.data.items is list &&
+        request.resource.data.items.size() >= 1 &&
+        request.resource.data.items.size() <= 10 &&
+        orderItemsValid(request.resource.data.items) &&
+        request.resource.data.totalPrice is number &&
+        request.resource.data.totalPrice == orderTotal(request.resource.data.items);
       allow update: if isAdmin(); // status changes by admin only
       allow delete: if false;
     }

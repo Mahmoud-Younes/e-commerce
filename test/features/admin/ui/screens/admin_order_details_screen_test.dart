@@ -32,6 +32,15 @@ OrderModel orderWithStatus(OrderStatus status) => OrderModel(
 void main() {
   late _MockAdminOrdersCubit cubit;
 
+  setUpAll(() {
+    // mocktail needs a fallback for every custom type used with any() —
+    // updateOrderStatus(order, status) and cancelOrder(order) both appear.
+    registerFallbackValue(
+      OrderModel(userId: 'fallback', createdAt: DateTime(2026)),
+    );
+    registerFallbackValue(OrderStatus.pending);
+  });
+
   setUp(() {
     cubit = _MockAdminOrdersCubit();
   });
@@ -95,11 +104,23 @@ void main() {
       await pumpLoaded(tester, OrderStatus.pending);
 
       expect(find.text('Advance to confirmed'), findsOneWidget);
-      expect(find.text('Cancel order'), findsOneWidget);
+      // The item list makes the content slightly taller than the default
+      // 800x600 test surface: the cancel button is built but sits just
+      // below the fold, so look past the viewport boundary.
+      expect(find.text('Cancel order', skipOffstage: false), findsOneWidget);
       // No skipping: no other step is offered.
-      expect(find.textContaining('Advance to preparing'), findsNothing);
-      expect(find.textContaining('Advance to shipped'), findsNothing);
-      expect(find.textContaining('Advance to delivered'), findsNothing);
+      expect(
+        find.textContaining('Advance to preparing', skipOffstage: false),
+        findsNothing,
+      );
+      expect(
+        find.textContaining('Advance to shipped', skipOffstage: false),
+        findsNothing,
+      );
+      expect(
+        find.textContaining('Advance to delivered', skipOffstage: false),
+        findsNothing,
+      );
     });
 
     testWidgets('a CONFIRMED order offers preparing and NO cancel button '
@@ -127,6 +148,12 @@ void main() {
           .thenAnswer((_) async {});
       await pumpLoaded(tester, OrderStatus.pending);
 
+      // The action buttons sit just below the fold of the default test
+      // surface (800x600) — reveal before tapping, else the tap misses.
+      await tester.ensureVisible(
+        find.text('Advance to confirmed', skipOffstage: false),
+      );
+      await tester.pump();
       await tester.tap(find.text('Advance to confirmed'));
       await tester.pump();
 
@@ -143,6 +170,13 @@ void main() {
       when(() => cubit.cancelOrder(any())).thenAnswer((_) async {});
       await pumpLoaded(tester, OrderStatus.pending);
 
+      // The cancel button sits just below the fold of the default test
+      // surface — scroll it into view before tapping (skipOffstage so the
+      // finder sees the built-but-not-painted element).
+      await tester.ensureVisible(
+        find.text('Cancel order', skipOffstage: false),
+      );
+      await tester.pump();
       await tester.tap(find.text('Cancel order'));
       await tester.pump();
 
@@ -152,17 +186,24 @@ void main() {
 
     testWidgets('shows the error snackbar when a status update is rejected '
         '(e.g. a jump outside the sequence)', (tester) async {
-      await pumpLoaded(tester, OrderStatus.pending);
-      // The user tapped something invalid; the cubit emitted the rejection.
-      cubit.emit(
-        const AdminOrdersState.statusUpdateError(
-          ApiErrorModel(
-            message:
-                'From pending the order can only move to '
-                'confirmed.',
+      // Feed the states through whenListen's stream: MockCubit.emit is an
+      // unstubbed mocktail method (a silent no-op), so emitted states never
+      // reach the BlocConsumer — the stream is the only delivery channel.
+      whenListen(
+        cubit,
+        Stream.fromIterable(const <AdminOrdersState>[
+          AdminOrdersState.statusUpdateError(
+            ApiErrorModel(
+              message: 'From pending the order can only move to confirmed.',
+            ),
           ),
+        ]),
+        initialState: AdminOrdersState.orderDetailsSuccess(
+          orderWithStatus(OrderStatus.pending),
         ),
       );
+      when(() => cubit.openOrder(any())).thenAnswer((_) async {});
+      await tester.pumpWidget(app());
       await tester.pumpAndSettle();
 
       expect(
@@ -173,12 +214,19 @@ void main() {
 
     testWidgets('shows the writeUnauthorized snackbar when a non-admin '
         'tries to write (PRD §5 role protection)', (tester) async {
-      await pumpLoaded(tester, OrderStatus.pending);
-      cubit.emit(
-        const AdminOrdersState.writeUnauthorized(
-          ApiErrorModel(message: 'Only admins can perform this action.'),
+      whenListen(
+        cubit,
+        Stream.fromIterable(const <AdminOrdersState>[
+          AdminOrdersState.writeUnauthorized(
+            ApiErrorModel(message: 'Only admins can perform this action.'),
+          ),
+        ]),
+        initialState: AdminOrdersState.orderDetailsSuccess(
+          orderWithStatus(OrderStatus.pending),
         ),
       );
+      when(() => cubit.openOrder(any())).thenAnswer((_) async {});
+      await tester.pumpWidget(app());
       await tester.pumpAndSettle();
 
       expect(find.text('Only admins can perform this action.'), findsOneWidget);
@@ -187,14 +235,20 @@ void main() {
     testWidgets('re-renders with the new status after a successful update', (
       tester,
     ) async {
-      await pumpLoaded(tester, OrderStatus.pending);
-
-      cubit.emit(
-        AdminOrdersState.statusUpdateSuccess(
-          orderWithStatus(OrderStatus.confirmed),
-          'Order is now confirmed.',
+      whenListen(
+        cubit,
+        Stream.fromIterable(<AdminOrdersState>[
+          AdminOrdersState.statusUpdateSuccess(
+            orderWithStatus(OrderStatus.confirmed),
+            'Order is now confirmed.',
+          ),
+        ]),
+        initialState: AdminOrdersState.orderDetailsSuccess(
+          orderWithStatus(OrderStatus.pending),
         ),
       );
+      when(() => cubit.openOrder(any())).thenAnswer((_) async {});
+      await tester.pumpWidget(app());
       await tester.pumpAndSettle();
 
       expect(find.text('confirmed'), findsOneWidget);

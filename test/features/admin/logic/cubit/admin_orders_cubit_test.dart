@@ -39,6 +39,12 @@ void main() {
   );
   final pendingOrder = orderWithStatus(OrderStatus.pending);
 
+  setUpAll(() {
+    // mocktail needs a fallback for every custom type used with any()/
+    // captureAny() — OrderStatus appears as updateStatus's 2nd argument.
+    registerFallbackValue(OrderStatus.pending);
+  });
+
   setUp(() {
     orderRepository = _MockOrderRepository();
     ordersSource = _MockAdminOrdersSource();
@@ -66,6 +72,9 @@ void main() {
         when(() => ordersSource.customerNames(any())).thenAnswer(
           (_) async => const ApiResult.success({'user-1': 'Mahmoud Younes'}),
         );
+        // Buffer the snapshot on the single-subscription controller so it is
+        // delivered the moment loadOrders() subscribes in act.
+        ordersController.add([pendingOrder]);
         return buildCubit();
       },
       act: (cubit) => cubit.loadOrders(),
@@ -155,10 +164,20 @@ void main() {
       },
       expect: () => <dynamic>[
         const AdminOrdersState.statusUpdateLoading(),
-        AdminOrdersState.statusUpdateSuccess(
-          orderWithStatus(OrderStatus.confirmed),
-          'Order is now confirmed.',
-        ),
+        // OrderModel has no == override, so assert the carried order
+        // field-wise instead of by instance equality.
+        isA<AdminOrderStatusUpdateSuccess>()
+            .having((s) => s.updatedOrder.id, 'updatedOrder.id', 'order-1')
+            .having(
+              (s) => s.updatedOrder.status,
+              'updatedOrder.status',
+              OrderStatus.confirmed,
+            )
+            .having(
+              (s) => s.successMessage,
+              'successMessage',
+              'Order is now confirmed.',
+            ),
       ],
     );
 
@@ -176,9 +195,12 @@ void main() {
           verifyNever(() => orderRepository.updateStatus(any(), any())),
       expect: () => <dynamic>[
         predicate<AdminOrderStatusUpdateError>(
+          // The cubit's rejection message names the current status and the
+          // one allowed next step ("From pending the order can only move to
+          // confirmed.") — it does not echo the attempted jump target.
           (state) =>
-              state.apiErrorModel.message!.contains('confirmed') &&
-              state.apiErrorModel.message!.contains('preparing'),
+              state.apiErrorModel.message!.contains('pending') &&
+              state.apiErrorModel.message!.contains('confirmed'),
           'statusUpdateError naming the only allowed next status',
         ),
       ],
@@ -276,10 +298,19 @@ void main() {
       },
       expect: () => <dynamic>[
         const AdminOrdersState.statusUpdateLoading(),
-        AdminOrdersState.statusUpdateSuccess(
-          orderWithStatus(OrderStatus.cancelled),
-          'Order is now cancelled.',
-        ),
+        // OrderModel has no == override — assert field-wise (see above).
+        isA<AdminOrderStatusUpdateSuccess>()
+            .having((s) => s.updatedOrder.id, 'updatedOrder.id', 'order-1')
+            .having(
+              (s) => s.updatedOrder.status,
+              'updatedOrder.status',
+              OrderStatus.cancelled,
+            )
+            .having(
+              (s) => s.successMessage,
+              'successMessage',
+              'Order is now cancelled.',
+            ),
       ],
     );
 

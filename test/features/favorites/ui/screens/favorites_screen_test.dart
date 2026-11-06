@@ -7,6 +7,7 @@ import 'package:e_commerce_app/core/repositories/product_repository.dart';
 import 'package:e_commerce_app/features/favorites/logic/cubit/favorites_cubit.dart';
 import 'package:e_commerce_app/features/favorites/ui/screens/favorites_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -26,8 +27,11 @@ void main() {
   );
   const grinder = ProductModel(name: 'Coffee Grinder', price: 59.0);
 
-  Future<void> flush() async {
-    await Future<void>.delayed(const Duration(milliseconds: 20));
+  // Advances the FakeAsync clock so timers/microtasks (stream delivery, the
+  // cubit's async chain) settle. A bare `await Future.delayed(...)` would
+  // deadlock testWidgets: fake timers only fire when the clock advances.
+  Future<void> flush(WidgetTester tester) async {
+    await tester.pump(const Duration(milliseconds: 20));
   }
 
   setUp(() {
@@ -55,10 +59,18 @@ void main() {
     WidgetTester tester, {
     required FavoritesCubit cubit,
   }) async {
+    // Mirror the app root (lib/e_commerce_app.dart:23) so flutter_screenutil's
+    // `.sp` text styles used by the screen initialize instead of throwing
+    // LateInitializationError under the test bindings.
     await tester.pumpWidget(
-      MaterialApp(home: FavoritesScreen(userId: 'user-1', cubit: cubit)),
+      ScreenUtilInit(
+        designSize: const Size(375, 812),
+        minTextAdapt: true,
+        splitScreenMode: true,
+        child: MaterialApp(home: FavoritesScreen(userId: 'user-1', cubit: cubit)),
+      ),
     );
-    await flush();
+    await flush(tester);
   }
 
   group('FavoritesScreen widget', () {
@@ -84,7 +96,10 @@ void main() {
         (tester) async {
       await pumpScreen(tester, cubit: buildCubit());
       idsController.add(const []);
-      await tester.pumpAndSettle();
+      await tester.pump();
+      // network image to a bogus URL never settles under test bindings —
+      // a bounded pump suffices; tile text/paint does not depend on image load.
+      await tester.pump(const Duration(seconds: 1));
 
       expect(find.byKey(const ValueKey('favoritesEmpty')), findsOneWidget);
       expect(find.text('No favorites yet'), findsOneWidget);
@@ -93,7 +108,10 @@ void main() {
     testWidgets('shows the error state when the stream fails', (tester) async {
       await pumpScreen(tester, cubit: buildCubit());
       idsController.addError(Exception('firestore down'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      // network image to a bogus URL never settles under test bindings —
+      // a bounded pump suffices; tile text/paint does not depend on image load.
+      await tester.pump(const Duration(seconds: 1));
 
       expect(find.byKey(const ValueKey('favoritesError')), findsOneWidget);
     });
@@ -102,7 +120,10 @@ void main() {
         (tester) async {
       await pumpScreen(tester, cubit: buildCubit());
       idsController.add(const ['p1', 'p2']);
-      await tester.pumpAndSettle();
+      await tester.pump();
+      // network image to a bogus URL never settles under test bindings —
+      // a bounded pump suffices; tile text/paint does not depend on image load.
+      await tester.pump(const Duration(seconds: 1));
 
       expect(find.byKey(const ValueKey('favoritesList')), findsOneWidget);
       expect(find.text('Espresso Machine'), findsOneWidget);
@@ -116,7 +137,10 @@ void main() {
         (tester) async {
       await pumpScreen(tester, cubit: buildCubit());
       idsController.add(const ['p1', 'p2']);
-      await tester.pumpAndSettle();
+      await tester.pump();
+      // network image to a bogus URL never settles under test bindings —
+      // a bounded pump suffices; tile text/paint does not depend on image load.
+      await tester.pump(const Duration(seconds: 1));
 
       await tester.tap(find.byKey(const ValueKey('remove-p1')));
       await tester.pump();
@@ -124,7 +148,10 @@ void main() {
 
       // The live stream re-emits the shorter list after the toggle.
       idsController.add(const ['p2']);
-      await tester.pumpAndSettle();
+      await tester.pump();
+      // network image to a bogus URL never settles under test bindings —
+      // a bounded pump suffices; tile text/paint does not depend on image load.
+      await tester.pump(const Duration(seconds: 1));
 
       expect(find.byKey(const ValueKey('favorite-p1')), findsNothing);
       expect(find.text('Espresso Machine'), findsNothing);
@@ -143,11 +170,13 @@ void main() {
         ),
       );
 
-      await tester.runAsync(() async {
-        await pumpScreen(tester, cubit: buildCubit());
-        idsController.add(const ['p1']);
-        await tester.pumpAndSettle();
-      });
+      // flutter_test's binding replaces HttpClient with a fake that fails
+      // immediately, so no tester.runAsync is needed — the image errors on
+      // the next advanced clock tick and errorBuilder swaps in the icon.
+      await pumpScreen(tester, cubit: buildCubit());
+      idsController.add(const ['p1']);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
 
       expect(find.text('Broken Image'), findsOneWidget);
     });

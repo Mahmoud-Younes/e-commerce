@@ -55,14 +55,16 @@ void main() {
   }
 
   /// Adds [docs] to the catalog stream and lets the delivery chain settle:
-  /// controller → cubit onData → `emit` → BlocBuilder.
+  /// controller → cubit onData → `emit` → BlocBuilder. Each `pump` advances
+  /// the FakeAsync clock and flushes the microtask chain — a bare
+  /// `await Future.delayed(...)` would deadlock testWidgets because fake
+  /// timers only fire when the clock advances.
   Future<void> emitCatalog(
     WidgetTester tester,
     List<ProductDoc> docs,
   ) async {
     controller.add(docs);
-    await Future<void>.delayed(Duration.zero);
-    await Future<void>.delayed(Duration.zero);
+    await tester.pump();
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
   }
@@ -149,8 +151,9 @@ void main() {
       'button (PRD §9 clear error state)', (tester) async {
     await pumpScreen(tester);
     controller.addError(Exception('stream blew up'));
-    await Future<void>.delayed(Duration.zero);
-    await Future<void>.delayed(Duration.zero);
+    // Pumps advance the FakeAsync clock so the error reaches the cubit —
+    // a bare `await Future.delayed(...)` would deadlock testWidgets.
+    await tester.pump();
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
 

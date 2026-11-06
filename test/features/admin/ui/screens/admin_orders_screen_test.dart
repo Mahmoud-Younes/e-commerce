@@ -160,13 +160,10 @@ void main() {
           {'user-1': 'Mahmoud Younes'},
         ),
       );
-      // openOrder is the details screen's initState call.
+      // openOrder is the details screen's initState call. NOTE: do NOT call
+      // whenListen again here — a second call would clobber the
+      // ordersSuccess state stub above and the list would never render.
       when(() => cubit.openOrder(any())).thenAnswer((_) async {});
-      whenListen(
-        cubit,
-        const Stream<AdminOrdersState>.empty(),
-        initialState: const AdminOrdersState.orderDetailsLoading(),
-      );
 
       await tester.pumpWidget(app());
       await tester.tap(find.byType(ListTile));

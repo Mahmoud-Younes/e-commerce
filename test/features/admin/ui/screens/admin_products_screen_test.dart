@@ -165,7 +165,12 @@ void main() {
       );
 
       await tester.pumpWidget(app());
-      await tester.pumpAndSettle();
+      // pumpAndSettle never settles here: while in writeUnauthorized the
+      // screen's builder falls back to a CircularProgressIndicator (see
+      // AdminProductsScreen._listOrSpinner), which schedules frames forever.
+      // Bounded pumps still deliver the stream states and the snackbar.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
 
       expect(find.text('Only admins can perform this action.'), findsOneWidget);
     });

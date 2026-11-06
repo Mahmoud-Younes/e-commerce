@@ -16,8 +16,10 @@ import 'fcm_mobile_guard.dart';
 /// Responsibilities:
 /// - request notification permission (mobile only; no-op on web/desktop via
 ///   [isMobilePlatform], so the app stays healthy there);
-/// - get the device token and persist it on the user's document
-///   (`users/{uid}.fcmToken`), refreshing it on `onTokenRefresh`;
+/// - register the app instance with FCM and persist the delivered token on
+///   the user's document (`users/{uid}.fcmToken`), refreshing it on
+///   `onRegistered` (firebase_messaging 17+ removed `getToken` /
+///   `onTokenRefresh` in favor of `register()` + `onRegistered`);
 /// - handle messages in all app states:
 ///   - foreground: [FirebaseMessaging.onMessage] → record the notification;
 ///   - background: top-level [firebaseMessagingBackgroundHandler] records it;
@@ -54,13 +56,9 @@ import 'fcm_mobile_guard.dart';
 /// mocks (`MockFirebaseMessaging`, `MockFirebaseAuth`) and
 /// `FakeFirebaseFirestore` directly.
 class FcmService {
-  FcmService({
-    FirebaseMessaging? messaging,
-    FirebaseAuth? auth,
-    FirebaseFirestore? firestore,
-  })  : _messaging = messaging,
-        _auth = auth,
-        _firestore = firestore;
+  // Private named initializing formals (Dart 3.7+): callers pass the public
+  // names `messaging:`, `auth:`, `firestore:` (e.g. mocks in unit tests).
+  FcmService({this._messaging, this._auth, this._firestore});
 
   final FirebaseMessaging? _messaging;
   final FirebaseAuth? _auth;
@@ -89,10 +87,13 @@ class FcmService {
     // not fatal — data messages still arrive and feed the in-app center.
     await requestPermission();
 
-    await getTokenAndSave();
-
-    // PRD §6: update the stored token whenever it changes.
-    _subscriptions.add(_msg.onTokenRefresh.listen(_saveToken));
+    // PRD §6: persist the token on the user's document and update it whenever
+    // it changes. `onRegistered` delivers the token for the initial
+    // registration and for every subsequent refresh, so it is subscribed
+    // BEFORE `register()` is awaited — the token arrives on the stream once
+    // registration completes (firebase_messaging 17+ has no direct `getToken`).
+    _subscriptions.add(_msg.onRegistered.listen(_saveToken));
+    await _msg.register();
 
     // Foreground (PRD §6): record into the in-app center. The OS does not
     // show a system notification for foreground data messages; the center
@@ -125,15 +126,39 @@ class FcmService {
 
   // ================================== TOKEN ===================================
 
-  /// Gets the FCM token and stores it on `users/{uid}` (PRD §6: "store it
-  /// securely" — the doc is only writable by the authenticated user's own
-  /// security rules). Returns the token, or null when unavailable/skipped.
+  /// Registers the app instance with FCM, stores the delivered token on
+  /// `users/{uid}` (PRD §6: "store it securely" — the doc is only writable by
+  /// the authenticated user's own security rules) and returns the token, or
+  /// null when unavailable/skipped.
   Future<String?> getTokenAndSave([String? userId]) async {
     if (!isMobilePlatform) return null;
-    final token = await _msg.getToken();
+    final token = await _registerForToken();
     if (token == null) return null;
     await _saveToken(token, userId);
     return token;
+  }
+
+  /// Registers this app instance with FCM and completes with the token once
+  /// it is delivered on `onRegistered` (firebase_messaging 17+ delivers the
+  /// token on that stream instead of a direct `getToken`). The wait is
+  /// bounded so a stalled registration cannot hang callers; returns null
+  /// when no token arrives.
+  Future<String?> _registerForToken() async {
+    final Completer<String?> tokenCompleter = Completer<String?>();
+    final StreamSubscription<String> registration =
+        _msg.onRegistered.listen(
+      tokenCompleter.complete,
+      onError: tokenCompleter.completeError,
+    );
+    try {
+      await _msg.register();
+      return await tokenCompleter.future.timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => null,
+      );
+    } finally {
+      await registration.cancel();
+    }
   }
 
   Future<void> _saveToken(String token, [String? userId]) async {

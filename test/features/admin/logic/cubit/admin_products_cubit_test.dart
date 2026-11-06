@@ -37,6 +37,18 @@ void main() {
     stock: 5,
   );
 
+  // ProductModel is a plain @JsonSerializable class without ==, so compare
+  // field by field (the cubit passes a copyWith product through to the repo).
+  void expectSameProduct(ProductModel actual, ProductModel expected) {
+    expect(actual.name, expected.name);
+    expect(actual.description, expected.description);
+    expect(actual.price, expected.price);
+    expect(actual.imageUrl, expected.imageUrl);
+    expect(actual.category, expected.category);
+    expect(actual.stock, expected.stock);
+    expect(actual.isAvailable, expected.isAvailable);
+  }
+
   setUpAll(() {
     // mocktail needs fallback values for every custom type used with any().
     registerFallbackValue(const ProductModel(name: 'fallback'));
@@ -71,6 +83,11 @@ void main() {
       build: () {
         when(() => productsSource.streamAllWithIds())
             .thenAnswer((_) => catalogController.stream);
+        // Buffer the snapshot on the single-subscription controller so it is
+        // delivered the moment loadProducts() subscribes in act.
+        catalogController.add([
+          AdminProductEntry(productId: 'p-1', product: product),
+        ]);
         return buildCubit();
       },
       act: (cubit) => cubit.loadProducts(),
@@ -159,7 +176,7 @@ void main() {
       verify: (_) {
         final captured = verify(() => productRepository.create(captureAny()))
             .captured;
-        expect(captured.single as ProductModel, product);
+        expectSameProduct(captured.single as ProductModel, product);
       },
       expect: () => <dynamic>[
         const AdminProductsState.submitLoading(),
@@ -208,7 +225,7 @@ void main() {
           () => productsSource.update(captureAny(), captureAny()),
         ).captured;
         expect(captured[0], 'p-9');
-        expect(captured[1] as ProductModel, product);
+        expectSameProduct(captured[1] as ProductModel, product);
         verifyNever(() => productRepository.create(any()));
       },
       expect: () => <dynamic>[

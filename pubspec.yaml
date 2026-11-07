@@ -68,6 +68,10 @@ dev_dependencies:
   fake_cloud_firestore: ^4.5.0
   firebase_auth_mocks: ^0.16.0
 
+  # Stage-7 integration tests (integration_test/ + test_driver/, flutter drive).
+  integration_test:
+    sdk: flutter
+
 # bloc_test pulls in `test`, whose only flutter_test-compatible release
 # (test 1.31.1 for test_api 0.7.12 pinned by the Flutter SDK) declares
 # analyzer <14, clashing with freezed's analyzer >=14. `flutter test` never

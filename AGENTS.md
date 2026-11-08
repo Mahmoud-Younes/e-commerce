@@ -13,10 +13,11 @@ flutter pub get                                              # deps
 flutter analyze                                              # lint / static analysis (no separate typecheck)
 flutter test                                                 # all unit + widget tests
 flutter test test/features/favorites                         # focused feature tests
+flutter test integration_test -d <device>                    # integration tests (boots the real app; needs emulator/device)
 dart run build_runner build --delete-conflicting-outputs     # freezed / json_serializable codegen
 ```
 
-E2E (Android only, final verification phase): build + install the APK first, then `npx e2e run`. Config in `e2e.config.ts` (device: Pixel 7 Pro emulator, bundleId `com.example.e_commerce_app`), specs in `tests/*.e2e.ts`.
+E2E (Android only, final verification phase): build + install the APK first, then `npx e2e run`. Config in `e2e.config.ts` (device: Pixel 7 Pro emulator, bundleId `com.example.e_commerce_app`), specs in `tests/*.e2e.ts`; runner output (report + per-spec traces) lands in `.e2e/`. Read the project e2e skill at `.agents/skills/e2e/SKILL.md` before writing or debugging specs.
 
 ## Layout & architecture
 
@@ -39,7 +40,7 @@ Feature-first structure (mirrors the `doc_doc` reference project):
 ## Gotchas
 
 - `dependency_overrides` in `pubspec.yaml` (`test: 1.31.1`, `analyzer >=14 <15`) resolve a bloc_test ↔ freezed analyzer clash — **do not remove or "fix" them**.
-- Two test roots by design: `test/` = Flutter tests, `tests/` = e2e TypeScript specs. Don't mix them.
+- Three test roots by design: `test/` = Flutter unit + widget tests, `integration_test/` = integration tests (run on a device), `tests/` = e2e TypeScript specs. Don't mix them.
 - Codegen files (`*.g.dart`, `*.freezed.dart`) are committed — never hand-edit; rerun build_runner after changing annotated models.
 - `lib/firebase_options.dart` and `android/app/google-services.json` are committed for Firebase project `sahety-ba784`.
 - Issues live in GitHub `Mahmoud-Younes/e-commerce` via `gh` CLI; writes need `GH_TOKEN` set (see `docs/agents/issue-tracker.md`).

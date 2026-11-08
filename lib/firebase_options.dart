@@ -21,10 +21,7 @@ class DefaultFirebaseOptions {
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for android - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return android;
       case TargetPlatform.iOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for ios - '
@@ -60,5 +57,16 @@ class DefaultFirebaseOptions {
     authDomain: 'sahety-ba784.firebaseapp.com',
     storageBucket: 'sahety-ba784.firebasestorage.app',
     measurementId: 'G-EW47E3KCHX',
+  );
+
+  // Android options derived from android/app/google-services.json (project
+  // sahety-ba784, package com.example.e_commerce_app) — the values the
+  // FlutterFire CLI generates for the committed google-services.json.
+  static const FirebaseOptions android = FirebaseOptions(
+    apiKey: 'AIzaSyA0DowfLdmfLxA98h4aIaDyi8NUGhd5EGU',
+    appId: '1:737811383840:android:f0b09eb96bb47f38fd9e45',
+    messagingSenderId: '737811383840',
+    projectId: 'sahety-ba784',
+    storageBucket: 'sahety-ba784.firebasestorage.app',
   );
 }

@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../../core/helpers/extensions.dart';
 import '../../../../core/routing/routes.dart';
 
-/// TODO: implemented in the catalog slice (PRD §2).
-/// The profile icon is a temporary entry point (stage 1 e2e access).
+/// Customer home (PRD §2 entry): the catalog, favorites and cart are reached
+/// from here; the profile icon remains the stage-1 e2e access point.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -15,13 +15,28 @@ class HomeScreen extends StatelessWidget {
         title: const Text('Home'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.favorite_border),
+            tooltip: 'Favorites',
+            onPressed: () => context.pushNamed(Routes.favoritesScreen),
+          ),
+          IconButton(
+            icon: const Icon(Icons.shopping_cart_outlined),
+            tooltip: 'Cart',
+            onPressed: () => context.pushNamed(Routes.cartScreen),
+          ),
+          IconButton(
             icon: const Icon(Icons.person_outline),
             tooltip: 'Profile',
             onPressed: () => context.pushNamed(Routes.profileScreen),
           ),
         ],
       ),
-      body: const Center(child: Text('Home — coming next')),
+      body: Center(
+        child: ElevatedButton(
+          onPressed: () => context.pushNamed(Routes.productsScreen),
+          child: const Text('Browse Products'),
+        ),
+      ),
     );
   }
 }

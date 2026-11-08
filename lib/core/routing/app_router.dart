@@ -14,12 +14,14 @@ import '../../features/auth/ui/screens/register_screen.dart';
 import '../di/dependency_injection.dart';
 import '../../features/cart/ui/screens/cart_screen.dart';
 import '../../features/catalog/ui/screens/home_screen.dart';
-import '../../features/catalog/ui/screens/product_details_screen.dart';
-import '../../features/catalog/ui/screens/products_screen.dart';
+import '../../features/products/ui/screens/product_details_screen.dart';
+import '../../features/products/ui/screens/products_screen.dart';
+import '../../features/checkout/logic/cubit/checkout_cubit.dart';
 import '../../features/checkout/ui/screens/checkout_screen.dart';
 import '../../features/checkout/ui/screens/order_success_screen.dart';
 import '../../features/favorites/ui/screens/favorites_screen.dart';
 import '../../features/notifications/ui/screens/notifications_screen.dart';
+import '../../features/orders/logic/cubit/orders_cubit.dart';
 import '../../features/orders/ui/screens/my_orders_screen.dart';
 import '../../features/orders/ui/screens/order_details_screen.dart';
 import 'routes.dart';
@@ -82,13 +84,33 @@ class AppRouter {
       // ================= AGENT C: CHECKOUT & ORDERS & ADMIN ==================
       // (edits inside this banner only)
       case Routes.checkoutScreen:
-        return MaterialPageRoute(builder: (_) => const CheckoutScreen());
+        // CheckoutArgs (prefilled address/phone) arrive as route arguments;
+        // null when pushed without prefill (the cubit falls back to its
+        // const default). Wiring per CheckoutScreen's doc comment.
+        return MaterialPageRoute(
+          builder: (_) => BlocProvider(
+            create: (_) => getIt<CheckoutCubit>(
+              param1: settings.arguments as CheckoutArgs?,
+            )..loadCheckout(),
+            child: const CheckoutScreen(),
+          ),
+        );
       case Routes.orderSuccessScreen:
         return MaterialPageRoute(builder: (_) => const OrderSuccessScreen());
       case Routes.myOrdersScreen:
-        return MaterialPageRoute(builder: (_) => const MyOrdersScreen());
+        return MaterialPageRoute(
+          builder: (_) => BlocProvider(
+            create: (_) => getIt<OrdersCubit>(),
+            child: const MyOrdersScreen(),
+          ),
+        );
       case Routes.orderDetailsScreen:
-        return MaterialPageRoute(builder: (_) => const OrderDetailsScreen());
+        return MaterialPageRoute(
+          builder: (_) => BlocProvider(
+            create: (_) => getIt<OrdersCubit>(),
+            child: const OrderDetailsScreen(),
+          ),
+        );
       case Routes.adminDashboardScreen:
         return MaterialPageRoute(builder: (_) => const AdminDashboardScreen());
       case Routes.adminProductFormScreen:

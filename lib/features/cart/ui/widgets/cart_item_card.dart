@@ -62,6 +62,7 @@ class CartItemCard extends StatelessWidget {
                       : () => onDecrease!(item),
                   icon: const Icon(Icons.remove_circle_outline),
                   color: ColorsManager.darkerGray,
+                  tooltip: 'Decrease quantity',
                 ),
                 Text(
                   '${item.quantity}',
@@ -75,6 +76,7 @@ class CartItemCard extends StatelessWidget {
                       : () => onIncrease!(item),
                   icon: const Icon(Icons.add_circle_outline),
                   color: ColorsManager.mainGreen,
+                  tooltip: 'Increase quantity',
                 ),
               ],
             ),
@@ -83,6 +85,7 @@ class CartItemCard extends StatelessWidget {
               onPressed: onRemove == null ? null : () => onRemove!(item),
               icon: const Icon(Icons.delete_outline),
               color: ColorsManager.red,
+              tooltip: 'Remove from cart',
             ),
           ],
         ),

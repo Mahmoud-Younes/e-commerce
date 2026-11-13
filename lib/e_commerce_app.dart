@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'core/di/dependency_injection.dart';
@@ -16,7 +17,12 @@ import 'features/catalog/ui/screens/home_screen.dart';
 
 class ECommerceApp extends StatelessWidget {
   final AppRouter appRouter;
-  const ECommerceApp({super.key, required this.appRouter});
+
+  /// Root navigator key, created in `main.dart` and also attached to
+  /// [FcmService] so tapped push notifications can navigate (order details).
+  final GlobalKey<NavigatorState>? navigatorKey;
+
+  const ECommerceApp({super.key, required this.appRouter, this.navigatorKey});
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +38,15 @@ class ECommerceApp extends StatelessWidget {
           useMaterial3: true,
         ),
         debugShowCheckedModeBanner: false,
+        // Locale follows the system (unresolved) — English + Arabic widgets
+        // (Material/Cupertino pickers, RTL mirroring) are both supported.
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [Locale('en'), Locale('ar')],
+        navigatorKey: navigatorKey,
         onGenerateRoute: appRouter.generateRoute,
         home: const AuthGate(),
       ),
@@ -101,8 +116,6 @@ class _LoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
-    );
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }

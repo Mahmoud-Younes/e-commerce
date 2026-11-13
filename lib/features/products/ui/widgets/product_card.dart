@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../../core/helpers/extensions.dart';
+import '../../../../core/helpers/product_localized_text.dart';
 import '../../../../core/routing/routes.dart';
 import '../../../../core/theming/colors.dart';
 import '../../../../core/theming/styles.dart';
@@ -42,9 +43,12 @@ class ProductCard extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   _ProductImage(imageUrl: product.imageUrl),
-                  Positioned(
+                  // Directional (not hard-coded `right`) so the heart stays
+                  // on the trailing edge under RTL.
+                  Positioned.directional(
+                    textDirection: Directionality.of(context),
                     top: 4.h,
-                    right: 2.w,
+                    end: 2.w,
                     child: FavoriteHeartButton(
                       productId: productDoc.id,
                       size: 18.r,
@@ -60,7 +64,9 @@ class ProductCard extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    product.name,
+                    // Resolved display name: Arabic under an Arabic locale
+                    // when `nameAr` exists, else the English name.
+                    productTextFor(context, product.name, product.nameAr),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyles.font14DarkGrayRegular.copyWith(

@@ -25,15 +25,27 @@ class ProductDoc {
           runtimeType == other.runtimeType &&
           id == other.id &&
           product.name == other.product.name &&
+          product.nameAr == other.product.nameAr &&
           product.description == other.product.description &&
+          product.descriptionAr == other.product.descriptionAr &&
           product.price == other.product.price &&
           product.imageUrl == other.product.imageUrl &&
           product.category == other.product.category &&
+          product.categoryAr == other.product.categoryAr &&
           product.stock == other.product.stock &&
           product.isAvailable == other.product.isAvailable;
 
   @override
-  int get hashCode => Object.hash(id, product.name, product.description,
-      product.price, product.imageUrl, product.category, product.stock,
+  int get hashCode => Object.hash(
+      id,
+      product.name,
+      product.nameAr,
+      product.description,
+      product.descriptionAr,
+      product.price,
+      product.imageUrl,
+      product.category,
+      product.categoryAr,
+      product.stock,
       product.isAvailable);
 }

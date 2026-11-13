@@ -15,8 +15,15 @@ class UserFields {
   static const String phone = 'phone';
   static const String address = 'address';
   static const String role = 'role';
-  /// map of `{token: true}` entries on the user doc (PRD: "device-token data if needed").
-  static const String fcmTokens = 'fcmTokens';
+
+  /// SCALAR FCM registration token on `users/{uid}` — the source of truth
+  /// for push delivery in this demo. Written by [FcmService] (see
+  /// `_saveToken`), read by the server-side Admin SDK watcher that sends
+  /// pushes. Multi-device token maps are out of scope.
+  static const String fcmToken = 'fcmToken';
+
+  /// Server timestamp of the last [fcmToken] write.
+  static const String fcmTokenUpdatedAt = 'fcmTokenUpdatedAt';
 }
 
 class OrderFields {
@@ -30,11 +37,16 @@ class OrderFields {
 }
 
 /// Supabase Storage config (product images; Firebase Storage requires Blaze).
-/// TODO(user): create the Supabase project + 'products' bucket and fill these.
+/// Real project credentials — [url]/[publishableKey] are consumed by
+/// `Supabase.initialize` in `lib/main.dart` (only when they are not
+/// `YOUR_` placeholders, so the app boots without Supabase too).
 class SupabaseConfig {
-  static const String url = 'YOUR_SUPABASE_PROJECT_URL';
-  static const String anonKey = 'YOUR_SUPABASE_ANON_KEY';
-  static const String productsBucket = 'products';
+  static const String url = 'https://qshiwfcssobenpjijjxo.supabase.co';
+  // Publishable key (supabase_flutter 2.18.3 named parameter; `anonKey` is
+  // deprecated in this SDK version).
+  static const String publishableKey =
+      'sb_publishable_cdo7buZrUWExB_gqWmejCA_RnVyRc0Z';
+  static const String productsBucket = 'product-images';
 }
 
 /// Role values stored on the user doc (mirror of [UserRole] enum names).

@@ -12,6 +12,7 @@ void main() {
 
   ProductModel product({
     String name = 'Running Shoes',
+    String? nameAr,
     String description = 'Comfortable shoes',
     double price = 99.5,
     String imageUrl = 'https://example.com/shoes.png',
@@ -21,6 +22,7 @@ void main() {
   }) =>
       ProductModel(
         name: name,
+        nameAr: nameAr,
         description: description,
         price: price,
         imageUrl: imageUrl,
@@ -127,6 +129,42 @@ void main() {
       final result = await repo.search('   ');
 
       expect((result as Success<List<ProductModel>>).data, hasLength(3));
+    });
+
+    group('bilingual search (matches name AND nameAr regardless of locale)',
+        () {
+      setUp(() async {
+        await firestore
+            .collection(FirestorePaths.products)
+            .add(product(name: 'Espresso Machine', nameAr: 'آلة إسبريسو')
+                .toJson());
+        await firestore
+            .collection(FirestorePaths.products)
+            .add(product(name: 'Laptop').toJson());
+      });
+
+      test('an Arabic query matches nameAr case-insensitively', () async {
+        final result = await repo.search('إسبريسو');
+
+        final products = (result as Success<List<ProductModel>>).data;
+        expect(products, hasLength(1));
+        expect(products.single.name, 'Espresso Machine');
+      });
+
+      test('an English query still matches the English name of a product '
+          'that also has nameAr', () async {
+        final result = await repo.search('ESPRESSO');
+
+        final products = (result as Success<List<ProductModel>>).data;
+        expect(products, hasLength(1));
+        expect(products.single.name, 'Espresso Machine');
+      });
+
+      test('a query matching neither language returns nothing', () async {
+        final result = await repo.search('قهوة');
+
+        expect((result as Success<List<ProductModel>>).data, isEmpty);
+      });
     });
   });
 

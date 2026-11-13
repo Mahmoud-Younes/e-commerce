@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
+import '../../../../core/helpers/product_localized_text.dart';
 import '../../../../core/theming/colors.dart';
 
 /// Horizontal category filter (PRD §2: browse products by category). The
@@ -43,7 +44,9 @@ class CategoryFilterChips extends StatelessWidget {
             (category) => Padding(
               padding: EdgeInsetsDirectional.only(end: 8.w),
               child: ChoiceChip(
-                label: Text(category),
+                // Arabic label from the canonical category map under an
+                // Arabic locale; falls back to the category key itself.
+                label: Text(categoryLabelFor(context, category)),
                 selected: selectedCategory == category,
                 selectedColor: ColorsManager.mainGreen,
                 labelStyle: TextStyle(

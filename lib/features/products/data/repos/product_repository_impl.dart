@@ -67,7 +67,11 @@ class ProductRepositoryImpl implements ProductRepository {
           .where(
             (product) =>
                 needle.isEmpty ||
-                product.name.toLowerCase().contains(needle),
+                // Bilingual search (PRD §2): match against BOTH the English
+                // name and the optional Arabic `nameAr`, regardless of the
+                // current locale.
+                product.name.toLowerCase().contains(needle) ||
+                (product.nameAr ?? '').toLowerCase().contains(needle),
           )
           .toList();
       return ApiResult.success(products);

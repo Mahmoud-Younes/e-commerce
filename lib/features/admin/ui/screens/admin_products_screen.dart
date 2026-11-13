@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../../core/helpers/extensions.dart';
+import '../../../../core/helpers/product_localized_text.dart';
 import '../../../../core/helpers/spacing.dart';
 import '../../../../core/routing/routes.dart';
 import '../../../../core/theming/styles.dart';
@@ -88,7 +89,11 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                         entry: entries[index],
                         onEdit: () => context.pushNamed(
                           Routes.adminProductFormScreen,
-                          arguments: entries[index].product,
+                          // The full entry (document ID + product) so the
+                          // form can prefill AND address the update. The
+                          // old `ProductModel?` argument dropped the ID the
+                          // update path needs.
+                          arguments: entries[index],
                         ),
                         onDelete: () => _confirmDelete(context, entries[index]),
                       ),
@@ -136,8 +141,8 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete product?'),
         content: Text(
-          '"${entry.product.name}" will be permanently removed from the '
-          'catalog.',
+          '"${entry.product.adminDisplayName}" will be permanently removed '
+          'from the catalog.',
           style: TextStyles.font14DarkGrayRegular,
         ),
         actions: [
@@ -180,7 +185,9 @@ class _ProductTile extends StatelessWidget {
       child: ListTile(
         leading: const Icon(Icons.image_outlined, color: Color(0xFF757575)),
         title: Text(
-          product.name,
+          // Locale-INDEPENDENT admin display: `name · nameAr` whenever the
+          // Arabic name exists, so the admin always sees both variants.
+          product.adminDisplayName,
           style: TextStyles.font14DarkGrayRegular.copyWith(
             fontWeight: FontWeight.w600,
           ),

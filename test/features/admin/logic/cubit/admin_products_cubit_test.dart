@@ -400,6 +400,163 @@ void main() {
       ],
     );
   });
+
+  group('AdminProductsCubit — Arabic fields (bilingual contract)', () {
+    test('validateProduct: empty or whitespace-only nameAr is optional '
+        '(passes)', () {
+      expect(
+        buildCubit().validateProduct(
+          const ProductModel(
+            name: 'Shoes',
+            price: 10,
+            category: 'Fashion',
+          ),
+        ),
+        isNull,
+      );
+      expect(
+        buildCubit().validateProduct(
+          const ProductModel(
+            name: 'Shoes',
+            nameAr: '  ',
+            price: 10,
+            category: 'Fashion',
+          ),
+        ),
+        isNull,
+      );
+    });
+
+    test('validateProduct: a non-empty nameAr must be at least 2 characters',
+        () {
+      expect(
+        buildCubit().validateProduct(
+          const ProductModel(
+            name: 'Shoes',
+            nameAr: 'ح',
+            price: 10,
+            category: 'Fashion',
+          ),
+        ),
+        contains('Arabic'),
+      );
+    });
+
+    test('startEditing prefills the Arabic controllers from the product and '
+        'resetForm clears them', () {
+      final cubit = buildCubit();
+      addTearDown(cubit.close);
+
+      cubit.startEditing(
+        const ProductModel(
+          name: 'Running Shoes',
+          nameAr: 'حذاء رياضي',
+          description: 'Comfortable shoes',
+          descriptionAr: 'حذاء مريح',
+          price: 99.5,
+          category: 'fashion',
+          stock: 5,
+        ),
+        productId: 'p-1',
+      );
+      expect(cubit.nameArController.text, 'حذاء رياضي');
+      expect(cubit.descriptionArController.text, 'حذاء مريح');
+
+      // A product WITHOUT Arabic variants prefills empty strings (create-like
+      // edit form).
+      cubit.startEditing(product);
+      expect(cubit.nameArController.text, isEmpty);
+      expect(cubit.descriptionArController.text, isEmpty);
+
+      cubit.resetForm();
+      expect(cubit.nameArController.text, isEmpty);
+      expect(cubit.descriptionArController.text, isEmpty);
+    });
+
+    blocTest<AdminProductsCubit, AdminProductsState>(
+      'submitProduct saves TRIMMED nameAr/descriptionAr from the form '
+      'controllers and derives categoryAr from the canonical category map',
+      build: () {
+        when(() => productRepository.create(any()))
+            .thenAnswer((_) async => ApiResult.success(product));
+        return buildCubit();
+      },
+      act: (cubit) async {
+        cubit.nameArController.text = '  حذاء رياضي  ';
+        cubit.descriptionArController.text = ' حذاء مريح ';
+        await cubit.submitProduct(product: product);
+      },
+      verify: (_) {
+        final captured = verify(() => productRepository.create(captureAny()))
+            .captured;
+        final saved = captured.single as ProductModel;
+        expect(saved.nameAr, 'حذاء رياضي');
+        expect(saved.descriptionAr, 'حذاء مريح');
+        // product.category is 'Fashion' → canonical map label (lowercased
+        // lookup), derived at save time — never a free-text input.
+        expect(saved.categoryAr, 'أزياء');
+      },
+      expect: () => <dynamic>[
+        const AdminProductsState.submitLoading(),
+        const AdminProductsState.submitSuccess('Product saved.'),
+      ],
+    );
+
+    blocTest<AdminProductsCubit, AdminProductsState>(
+      'submitProduct writes null Arabic fields when the inputs are empty '
+      '(a cleared field clears on Firestore update via explicit nulls)',
+      build: () {
+        when(() => productRepository.create(any()))
+            .thenAnswer((_) async => ApiResult.success(product));
+        return buildCubit();
+      },
+      act: (cubit) async {
+        cubit.nameArController.text = '   ';
+        cubit.descriptionArController.text = '';
+        await cubit.submitProduct(product: product);
+      },
+      verify: (_) {
+        final captured = verify(() => productRepository.create(captureAny()))
+            .captured;
+        final saved = captured.single as ProductModel;
+        expect(saved.nameAr, isNull);
+        expect(saved.descriptionAr, isNull);
+      },
+      expect: () => <dynamic>[
+        const AdminProductsState.submitLoading(),
+        const AdminProductsState.submitSuccess('Product saved.'),
+      ],
+    );
+
+    blocTest<AdminProductsCubit, AdminProductsState>(
+      'submitProduct with an unknown category saves a null categoryAr (the '
+      'label falls back to the raw key at display time)',
+      build: () {
+        when(() => productRepository.create(any()))
+            .thenAnswer((_) async => ApiResult.success(product));
+        return buildCubit();
+      },
+      act: (cubit) async {
+        await cubit.submitProduct(
+          product: const ProductModel(
+            name: 'Running Shoes',
+            price: 99.5,
+            category: 'kitchen',
+            stock: 5,
+          ),
+        );
+      },
+      verify: (_) {
+        final captured = verify(() => productRepository.create(captureAny()))
+            .captured;
+        expect((captured.single as ProductModel).categoryAr, isNull);
+      },
+      expect: () => <dynamic>[
+        const AdminProductsState.submitLoading(),
+        const AdminProductsState.submitSuccess('Product saved.'),
+      ],
+    );
+  });
 }
 
 

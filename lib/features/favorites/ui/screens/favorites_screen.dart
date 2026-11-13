@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/di/dependency_injection.dart';
+import '../../../../core/helpers/product_localized_text.dart';
 import '../../../../core/models/product_model.dart';
 import '../../../../core/theming/styles.dart';
 import '../../data/models/favorite_item.dart';
@@ -138,7 +139,10 @@ class _FavoriteTile extends StatelessWidget {
               fit: BoxFit.cover,
               errorBuilder: (_, _, _) => const Icon(Icons.image_outlined),
             ),
-      title: Text(product.name, style: TextStyles.font14DarkGrayRegular),
+      title: Text(
+        productTextFor(context, product.name, product.nameAr),
+        style: TextStyles.font14DarkGrayRegular,
+      ),
       subtitle: Text(
         '\$${product.price.toStringAsFixed(2)}',
         style: TextStyles.font14GrayRegular,

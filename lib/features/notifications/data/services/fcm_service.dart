@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/firestore_paths.dart';
+import '../../../../core/helpers/constants.dart';
 import '../../../../core/routing/routes.dart';
 import '../../../../firebase_options.dart';
 import 'fcm_mobile_guard.dart';
@@ -17,14 +18,19 @@ import 'fcm_mobile_guard.dart';
 /// - request notification permission (mobile only; no-op on web/desktop via
 ///   [isMobilePlatform], so the app stays healthy there);
 /// - register the app instance with FCM and persist the delivered token on
-///   the user's document (`users/{uid}.fcmToken`), refreshing it on
-///   `onRegistered` (firebase_messaging 17+ removed `getToken` /
-///   `onTokenRefresh` in favor of `register()` + `onRegistered`);
+///   the user's document (`users/{uid}.fcmToken` — scalar, see
+///   [UserFields.fcmToken]), refreshing it on `onRegistered`
+///   (firebase_messaging 17+ removed `getToken` / `onTokenRefresh` in favor
+///   of `register()` + `onRegistered`);
 /// - handle messages in all app states:
-///   - foreground: [FirebaseMessaging.onMessage] → record the notification;
-///   - background: top-level [firebaseMessagingBackgroundHandler] records it;
-///   - terminated: [firebaseMessagingBackgroundHandler] ran on delivery, and
-///     the tap is resolved by [FirebaseMessaging.getInitialMessage];
+///   - foreground: [FirebaseMessaging.onMessage] → no-op on purpose (the
+///     server-side watcher that sent the push already created the
+///     `notifications/{id}` record, so the in-app center updates through its
+///     own Firestore stream);
+///   - background: top-level [firebaseMessagingBackgroundHandler]
+///     (registered in `lib/main.dart` before `runApp`) — same contract, no
+///     client-side writes;
+///   - terminated: the tap is resolved by [FirebaseMessaging.getInitialMessage];
 /// - a tapped notification carrying `orderId` in its data opens the order
 ///   details screen via named navigation:
 ///   `pushNamed(Routes.orderDetailsScreen, arguments: orderId)` — the exact
@@ -32,12 +38,13 @@ import 'fcm_mobile_guard.dart';
 ///   (lib/features/orders/ui/screens/order_details_screen.dart:16-31,
 ///   lib/features/orders/ui/screens/my_orders_screen.dart:35).
 ///
-/// SENDING (PRD §6): notifications are sent from a trusted server
-/// (Cloud Functions with the Firebase Admin SDK). No sending credentials or
-/// server keys live in this app.
-/// TODO(owner): implement the Cloud Function trigger on order-status change
-/// that sends an FCM data message `{orderId, userId, title, body}` to
-/// `users/{uid}.fcmToken` and drops the `notifications/{id}` record server-side.
+/// SENDING (PRD §6): notifications are sent from a trusted server — an
+/// Admin SDK watcher outside this repo (`scripts/watch-orders.mjs`) that
+/// (1) creates the `notifications/{id}` record (firestore.rules only allow
+/// admins to create those docs, so this app never writes them client-side)
+/// and (2) sends an FCM message carrying a `{orderId, status}` data payload
+/// to the recipient's [UserFields.fcmToken] — the tap handler here reads
+/// only `orderId`. No sending credentials or server keys live in this app.
 ///
 /// get_it registration (merge agent applies it in
 /// `lib/core/di/dependency_injection.dart`):
@@ -101,7 +108,9 @@ class FcmService {
     _subscriptions.add(FirebaseMessaging.onMessage.listen(_handleForeground));
 
     // Background tap (PRD §6: tapping opens order details).
-    _subscriptions.add(FirebaseMessaging.onMessageOpenedApp.listen(handleMessageTap));
+    _subscriptions.add(
+      FirebaseMessaging.onMessageOpenedApp.listen(handleMessageTap),
+    );
 
     // Terminated tap (PRD §6): the app was cold-started by the notification.
     final initialMessage = await _msg.getInitialMessage();
@@ -145,8 +154,7 @@ class FcmService {
   /// when no token arrives.
   Future<String?> _registerForToken() async {
     final Completer<String?> tokenCompleter = Completer<String?>();
-    final StreamSubscription<String> registration =
-        _msg.onRegistered.listen(
+    final StreamSubscription<String> registration = _msg.onRegistered.listen(
       tokenCompleter.complete,
       onError: tokenCompleter.completeError,
     );
@@ -164,37 +172,32 @@ class FcmService {
   Future<void> _saveToken(String token, [String? userId]) async {
     final uid = userId ?? _currentUserId();
     if (uid == null || uid.isEmpty) return;
-    await _userDoc(uid).set(
-      <String, dynamic>{
-        'fcmToken': token,
-        'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
-      },
-      SetOptions(merge: true),
-    );
+    await _userDoc(uid).set(<String, dynamic>{
+      UserFields.fcmToken: token,
+      UserFields.fcmTokenUpdatedAt: FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 
   // ================================ MESSAGES ==================================
 
   void _handleForeground(RemoteMessage message) {
-    // Fire-and-forget: recording must not crash the UI stream.
-    recordOrderNotification(
-      message,
-      _firestore ?? FirebaseFirestore.instance,
-      userId: _currentUserId(),
-    ).catchError((_) {});
+    // Intentional no-op: the server-side watcher that sent this push already
+    // created the `notifications/{id}` record (client writes to that
+    // collection are denied by firestore.rules), and the in-app notification
+    // center picks the record up through its own Firestore stream.
+    assert(() {
+      debugPrint(
+        'FCM foreground message${message.data.containsKey('orderId') ? ' (orderId: ${message.data['orderId']})' : ''}',
+      );
+      return true;
+    }());
   }
 
-  /// A notification was tapped (background or terminated). Records it and —
-  /// when it carries an `orderId` — opens the order details screen
-  /// (PRD §6), using the same route seam as the orders feature.
+  /// A notification was tapped (background or terminated). When it carries
+  /// an `orderId` it opens the order details screen (PRD §6), using the
+  /// same route seam as the orders feature.
   @visibleForTesting
   Future<void> handleMessageTap(RemoteMessage message) async {
-    await recordOrderNotification(
-      message,
-      _firestore ?? FirebaseFirestore.instance,
-      userId: _currentUserId(),
-    );
-
     final orderId = message.data['orderId'];
     if (orderId is String && orderId.isNotEmpty) {
       _navigatorKey?.currentState?.pushNamed(
@@ -214,8 +217,9 @@ class FcmService {
   }
 
   DocumentReference<Map<String, dynamic>> _userDoc(String uid) =>
-      (_firestore ?? FirebaseFirestore.instance)
-          .doc(FirestorePaths.userDoc(uid));
+      (_firestore ?? FirebaseFirestore.instance).doc(
+        FirestorePaths.userDoc(uid),
+      );
 
   /// Cancels all message/token subscriptions.
   Future<void> dispose() async {
@@ -234,39 +238,14 @@ class FcmService {
 /// FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 /// ```
 /// In the background isolate the signed-in user is not resolvable reliably,
-/// so the sender (Cloud Function — TODO(owner)) must include `userId` in the
-/// data payload.
+/// so the sender (the server-side Admin SDK watcher) must include `userId`
+/// in the data payload.
+///
+/// No client-side writes here: `notifications/{id}` records are created by
+/// that watcher (firestore.rules only allow admins to create them). A cold
+/// start caused by a notification tap is resolved by
+/// [FcmService.initialize] via `getInitialMessage`.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await recordOrderNotification(
-    message,
-    FirebaseFirestore.instance,
-    userId: message.data['userId'] as String?,
-  );
-}
-
-/// Records an incoming order notification into the in-app notification
-/// center collection (`notifications` — PRD §6/§7) when it carries an
-/// `orderId`; promotional messages without one are ignored.
-Future<void> recordOrderNotification(
-  RemoteMessage message,
-  FirebaseFirestore firestore, {
-  String? userId,
-}) async {
-  final orderId = message.data['orderId'];
-  if (orderId is! String || orderId.isEmpty) return;
-
-  await firestore.collection(FirestorePaths.notifications).add(
-    <String, dynamic>{
-      'userId': userId ?? '',
-      'title':
-          message.notification?.title ?? (message.data['title'] as String?) ?? '',
-      'body':
-          message.notification?.body ?? (message.data['body'] as String?) ?? '',
-      'orderId': orderId,
-      'isRead': false,
-      'createdAt': FieldValue.serverTimestamp(),
-    },
-  );
 }

@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -87,6 +88,17 @@ class AppRouter {
         // CheckoutArgs (prefilled address/phone) arrive as route arguments;
         // null when pushed without prefill (the cubit falls back to its
         // const default). Wiring per CheckoutScreen's doc comment.
+        // A signed-out deep link must not build a CheckoutCubit with an
+        // empty uid (order creation would be rejected by the rules) —
+        // bounce to login instead of silently proceeding.
+        if (FirebaseAuth.instance.currentUser == null) {
+          return MaterialPageRoute(
+            builder: (_) => BlocProvider(
+              create: (context) => getIt<LoginCubit>(),
+              child: const LoginScreen(),
+            ),
+          );
+        }
         return MaterialPageRoute(
           builder: (_) => BlocProvider(
             create: (_) => getIt<CheckoutCubit>(

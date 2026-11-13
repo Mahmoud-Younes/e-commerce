@@ -20,18 +20,12 @@ class UserModel {
   @JsonKey(defaultValue: UserRoleValues.customer)
   final String role;
 
-  /// map of `{token: true}` entries on the user doc (PRD: "device-token data
-  /// if needed") — keyed map makes add/remove an O(1) field update.
-  @JsonKey(defaultValue: {})
-  final Map<String, bool> fcmTokens;
-
   const UserModel({
     required this.name,
     required this.email,
     this.phone = '',
     this.address = '',
     this.role = UserRoleValues.customer,
-    this.fcmTokens = const {},
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) =>
@@ -50,7 +44,6 @@ class UserModel {
     String? phone,
     String? address,
     String? role,
-    Map<String, bool>? fcmTokens,
   }) {
     return UserModel(
       name: name ?? this.name,
@@ -58,7 +51,6 @@ class UserModel {
       phone: phone ?? this.phone,
       address: address ?? this.address,
       role: role ?? this.role,
-      fcmTokens: fcmTokens ?? this.fcmTokens,
     );
   }
 }

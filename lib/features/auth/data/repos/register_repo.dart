@@ -29,7 +29,6 @@ class RegisterRepo {
         UserFields.phone: '',
         UserFields.address: '',
         UserFields.role: UserRoleValues.customer,
-        UserFields.fcmTokens: <String, bool>{},
       });
       return ApiResult.success(credential.user!);
     } catch (error) {

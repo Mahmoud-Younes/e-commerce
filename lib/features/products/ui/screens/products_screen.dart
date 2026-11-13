@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
+import '../../../../core/helpers/product_localized_text.dart';
 import '../../../../core/helpers/spacing.dart';
 import '../../../../core/theming/colors.dart';
 import '../../../../core/theming/styles.dart';
@@ -161,10 +162,15 @@ class _EmptyView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The selected category is echoed with its localized label (Arabic map
+    // label under an Arabic locale, else the canonical key).
+    final categoryLabel = selectedCategory == null
+        ? null
+        : categoryLabelFor(context, selectedCategory!);
     final message = searchQuery.trim().isNotEmpty
         ? 'No products match "${searchQuery.trim()}".'
-        : selectedCategory != null
-        ? 'No products in "$selectedCategory" yet.'
+        : categoryLabel != null
+        ? 'No products in "$categoryLabel" yet.'
         : 'No products available yet.';
     return Center(
       child: Column(

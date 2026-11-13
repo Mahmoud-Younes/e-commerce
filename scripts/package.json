@@ -1,0 +1,20 @@
+{
+  "name": "e-commerce-ops-scripts",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Local ops tooling for the Flutter e-commerce app: seed a bilingual demo catalog (Firestore + Supabase Storage) and watch orders to send FCM pushes + in-app notifications.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "seed": "node seed.mjs",
+    "admin": "node bootstrap-admin.mjs",
+    "watch": "node watch-orders.mjs",
+    "reset": "node reset.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.0.0",
+    "firebase-admin": "^13.0.0"
+  }
+}

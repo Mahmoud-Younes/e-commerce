@@ -9,11 +9,12 @@ import '../../../../core/networking/api_result.dart';
 
 /// Uploads admin product images (PRD §2: product image).
 ///
-/// TODO(user/owner): [SupabaseConfig.url] and [SupabaseConfig.anonKey] are
-/// still placeholders (see `lib/core/helpers/constants.dart`). Create the
-/// Supabase project + `products` bucket and fill the config — until then
-/// [SupabaseAdminImageUploader.isConfigured] is false and the admin product
-/// form falls back to the manual `imageUrl` text field only.
+/// Uses the real Supabase project from [SupabaseConfig] (public
+/// `product-images` bucket). This uploader does NOT initialize the Supabase
+/// SDK itself — `Supabase.initialize` happens once in `lib/main.dart`, and
+/// only when the config holds real values. When
+/// [SupabaseAdminImageUploader.isConfigured] is false (placeholder config)
+/// the admin product form falls back to the manual `imageUrl` text field.
 ///
 /// get_it registration (merge agent applies it):
 /// ```dart
@@ -24,8 +25,8 @@ abstract class AdminImageUploader {
   /// manual `imageUrl` field and never calls [upload].
   bool get isConfigured;
 
-  /// Upload [bytes] as [fileName] to the Supabase `products` bucket and
-  /// return its public URL (to be stored in `products/{id}.imageUrl`).
+  /// Upload [bytes] as [fileName] to the Supabase `product-images` bucket
+  /// and return its public URL (to be stored in `products/{id}.imageUrl`).
   Future<ApiResult<String>> upload({
     required Uint8List bytes,
     required String fileName,
@@ -40,7 +41,7 @@ class SupabaseAdminImageUploader implements AdminImageUploader {
 
   @override
   bool get isConfigured =>
-      _isReal(SupabaseConfig.url) && _isReal(SupabaseConfig.anonKey);
+      _isReal(SupabaseConfig.url) && _isReal(SupabaseConfig.publishableKey);
 
   @override
   Future<ApiResult<String>> upload({
@@ -48,19 +49,20 @@ class SupabaseAdminImageUploader implements AdminImageUploader {
     required String fileName,
   }) async {
     if (!isConfigured) {
-      // Placeholder config — never touch Supabase.instance (it is not even
-      // initialized in main.dart yet).
+      // Placeholder config — never touch Supabase.instance (it is only
+      // initialized in main.dart when the config is real).
       return const ApiResult.failure(
         ApiErrorModel(
-          message:
-              'Image upload is not configured yet. Enter an image URL manually.',
+          message: 'Image upload is not configured yet. Enter an image URL manually.',
         ),
       );
     }
     try {
-      final bucket = Supabase.instance.client.storage
-          .from(SupabaseConfig.productsBucket);
-      final path = 'products/${DateTime.now().microsecondsSinceEpoch}_$fileName';
+      final bucket = Supabase.instance.client.storage.from(
+        SupabaseConfig.productsBucket,
+      );
+      final path =
+          'products/${DateTime.now().microsecondsSinceEpoch}_$fileName';
       await bucket.uploadBinary(
         path,
         bytes,

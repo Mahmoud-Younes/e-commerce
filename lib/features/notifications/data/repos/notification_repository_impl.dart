@@ -11,9 +11,10 @@ import '../../../../core/repositories/notification_repository.dart';
 /// ([FirestorePaths.notificationDoc]) with fields
 /// userId, title, body, orderId, isRead, createdAt.
 ///
-/// Writing those records is done by [FcmService] when a push with an
-/// `orderId` arrives (PRD §6) and by the trusted-server Cloud Functions;
-/// this repo only reads/marks the stored records.
+/// Records are created ONLY by the trusted server (Admin SDK watcher that
+/// also sends the push): firestore.rules deny client writes to this
+/// collection for non-admins, so [FcmService] and this repo never write
+/// them — this repo only reads/marks the stored records.
 ///
 /// get_it registration (merge agent applies it in
 /// `lib/core/di/dependency_injection.dart`):
@@ -27,7 +28,7 @@ import '../../../../core/repositories/notification_repository.dart';
 /// directly (same seam as [OrderRepositoryImpl]).
 class NotificationRepositoryImpl implements NotificationRepository {
   NotificationRepositoryImpl({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
 
@@ -39,8 +40,7 @@ class NotificationRepositoryImpl implements NotificationRepository {
         .orderBy('createdAt', descending: true) // newest first (PRD §6)
         .snapshots()
         .map(
-          (snapshot) =>
-              snapshot.docs.map(NotificationModel.fromDoc).toList(),
+          (snapshot) => snapshot.docs.map(NotificationModel.fromDoc).toList(),
         );
   }
 

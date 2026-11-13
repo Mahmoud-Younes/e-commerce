@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/helpers/product_localized_text.dart';
 import '../../../../core/models/product_model.dart';
 import '../../../../core/networking/api_error_handler.dart';
 import '../../../../core/networking/api_error_model.dart';
@@ -30,7 +31,9 @@ import 'admin_products_state.dart';
 /// Route names this feature documents for the router (merge agent):
 /// - `adminProducts`      → `/adminProducts`   → AdminProductsScreen
 /// - (existing) `/adminProductFormScreen` → AdminProductFormScreen with
-///   `settings.arguments as ProductModel?` (null = create mode).
+///   `settings.arguments as AdminProductEntry?` (null = create mode; the
+///   entry carries the document ID the update path needs, which
+///   [ProductModel] deliberately does not).
 ///
 /// Write safety: EVERY write (create/update/delete) first asks
 /// [AdminRoleGuard.ensureAdmin]; a non-admin gets
@@ -50,10 +53,16 @@ class AdminProductsCubit extends Cubit<AdminProductsState> {
 
   StreamSubscription<List<AdminProductEntry>>? _catalogSubscription;
 
+  /// Document ID of the product being edited (null in create mode). Set by
+  /// [startEditing] when the form screen passes an [AdminProductEntry].
+  String? _editingProductId;
+
   // Product form controllers + key (same pattern as LoginCubit/ProfileCubit).
   final formKey = GlobalKey<FormState>();
   final nameController = TextEditingController();
+  final nameArController = TextEditingController();
   final descriptionController = TextEditingController();
+  final descriptionArController = TextEditingController();
   final priceController = TextEditingController();
   final categoryController = TextEditingController();
   final stockController = TextEditingController();
@@ -76,10 +85,16 @@ class AdminProductsCubit extends Cubit<AdminProductsState> {
         );
   }
 
-  /// Prefills the form for edit mode; call with null for create mode.
-  void startEditing(ProductModel product) {
+  /// Prefills the form for edit mode; call with null for create mode. The
+  /// Arabic fields (nameAr/descriptionAr) prefill from the product's stored
+  /// Arabic variants — empty when absent. [productId] records which document
+  /// an update addresses (ProductModel carries no id field).
+  void startEditing(ProductModel product, {String? productId}) {
+    _editingProductId = productId;
     nameController.text = product.name;
+    nameArController.text = product.nameAr ?? '';
     descriptionController.text = product.description;
+    descriptionArController.text = product.descriptionAr ?? '';
     priceController.text = product.price == 0 ? '' : product.price.toString();
     categoryController.text = product.category;
     stockController.text = product.stock.toString();
@@ -88,8 +103,11 @@ class AdminProductsCubit extends Cubit<AdminProductsState> {
   }
 
   void resetForm() {
+    _editingProductId = null;
     nameController.clear();
+    nameArController.clear();
     descriptionController.clear();
+    descriptionArController.clear();
     priceController.clear();
     categoryController.clear();
     stockController.clear();
@@ -100,9 +118,17 @@ class AdminProductsCubit extends Cubit<AdminProductsState> {
   /// Field-level validation mirrored in the form's validators. Returns the
   /// error message, or null when the payload is valid (PRD §2: name,
   /// description, price, imageUrl, category, stock, availability).
+  ///
+  /// The Arabic fields are OPTIONAL (bilingual contract): empty values are
+  /// never validated; only a non-empty `nameAr` must satisfy the same
+  /// minimum-length rule as the English name.
   String? validateProduct(ProductModel product) {
     if (product.name.trim().length < 2) {
       return 'Product name must be at least 2 characters.';
+    }
+    final nameAr = product.nameAr?.trim() ?? '';
+    if (nameAr.isNotEmpty && nameAr.length < 2) {
+      return 'Arabic product name must be at least 2 characters.';
     }
     if (product.price <= 0) {
       return 'Price must be greater than 0.';
@@ -120,18 +146,45 @@ class AdminProductsCubit extends Cubit<AdminProductsState> {
     return null;
   }
 
-  /// Create ([existingProductId] == null) or update a product. When
-  /// [imageBytes] is provided the image is uploaded through
+  /// Create or update a product. The English fields come in via [product]
+  /// (built by the form from its controllers); the optional Arabic fields
+  /// always come from this cubit's own controllers:
+  /// - `nameAr` / `descriptionAr`: saved when non-empty (trimmed), `null`
+  ///   otherwise — a cleared field also clears on Firestore `update()`
+  ///   (toJson serializes the explicit null);
+  /// - `categoryAr`: never a free-text input — derived from the selected
+  ///   canonical category via [kCategoryArLabels] at save time (`null` when
+  ///   the category has no Arabic label).
+  ///
+  /// When [imageBytes] is provided the image is uploaded through
   /// [AdminImageUploader] — which refuses placeholder Supabase config, so
   /// the manual [ProductModel.imageUrl] field stays the fallback (TODO for
   /// the owner, see [AdminImageUploader]).
+  ///
+  /// [existingProductId] addresses the update; when omitted, the ID recorded
+  /// by [startEditing] is used (form edit mode).
   Future<void> submitProduct({
     required ProductModel product,
     String? existingProductId,
     Uint8List? imageBytes,
     String? imageFileName,
   }) async {
-    final validationError = validateProduct(product);
+    // Merge the optional Arabic fields BEFORE validating so the non-empty
+    // `nameAr` rule applies to the same payload that gets written.
+    final payload = ProductModel(
+      name: product.name,
+      nameAr: _optionalArabic(nameArController.text),
+      description: product.description,
+      descriptionAr: _optionalArabic(descriptionArController.text),
+      price: product.price,
+      imageUrl: product.imageUrl,
+      category: product.category,
+      categoryAr: categoryArLabel(product.category),
+      stock: product.stock,
+      isAvailable: product.isAvailable,
+    );
+
+    final validationError = validateProduct(payload);
     if (validationError != null) {
       emit(AdminProductsState.submitError(
         ApiErrorModel(message: validationError),
@@ -148,7 +201,7 @@ class AdminProductsCubit extends Cubit<AdminProductsState> {
       return;
     }
 
-    var imageUrl = product.imageUrl.trim();
+    var imageUrl = payload.imageUrl.trim();
     if (imageBytes != null) {
       final upload = await _imageUploader.upload(
         bytes: imageBytes,
@@ -167,23 +220,29 @@ class AdminProductsCubit extends Cubit<AdminProductsState> {
       imageUrl = uploadedUrl;
     }
 
-    final payload = product.copyWith(imageUrl: imageUrl);
-    if (existingProductId == null) {
-      final response = await _productRepository.create(payload);
+    final savedProduct = payload.copyWith(imageUrl: imageUrl);
+    final updateId = existingProductId ?? _editingProductId;
+    if (updateId == null) {
+      final response = await _productRepository.create(savedProduct);
       response.when(
         success: (_) => _emitSubmitSuccess(),
         failure: (apiErrorModel) =>
             emit(AdminProductsState.submitError(apiErrorModel)),
       );
     } else {
-      final response =
-          await _productsSource.update(existingProductId, payload);
+      final response = await _productsSource.update(updateId, savedProduct);
       response.when(
         success: (_) => _emitSubmitSuccess(),
         failure: (apiErrorModel) =>
             emit(AdminProductsState.submitError(apiErrorModel)),
       );
     }
+  }
+
+  /// Arabic form values are optional: trimmed text, or `null` when empty.
+  String? _optionalArabic(String raw) {
+    final trimmed = raw.trim();
+    return trimmed.isEmpty ? null : trimmed;
   }
 
   void _emitSubmitSuccess() {
@@ -225,7 +284,9 @@ class AdminProductsCubit extends Cubit<AdminProductsState> {
   Future<void> close() {
     _catalogSubscription?.cancel();
     nameController.dispose();
+    nameArController.dispose();
     descriptionController.dispose();
+    descriptionArController.dispose();
     priceController.dispose();
     categoryController.dispose();
     stockController.dispose();

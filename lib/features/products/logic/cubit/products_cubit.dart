@@ -76,9 +76,12 @@ class ProductsCubit extends Cubit<ProductsState> {
           final matchesCategory =
               _selectedCategory == null ||
               doc.product.category == _selectedCategory;
+          // Bilingual search (PRD §2): match the English name AND the
+          // optional Arabic `nameAr`, regardless of the current locale.
           final matchesQuery =
               needle.isEmpty ||
-              doc.product.name.toLowerCase().contains(needle);
+              doc.product.name.toLowerCase().contains(needle) ||
+              (doc.product.nameAr ?? '').toLowerCase().contains(needle);
           return matchesCategory && matchesQuery;
         }).toList();
 

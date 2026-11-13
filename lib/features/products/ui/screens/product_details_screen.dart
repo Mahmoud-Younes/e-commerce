@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
+import '../../../../core/helpers/product_localized_text.dart';
 import '../../../../core/helpers/spacing.dart';
 import '../../../../core/models/product_model.dart';
 import '../../../../core/theming/colors.dart';
@@ -99,6 +100,14 @@ class _ProductDetailsBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final productId = ModalRoute.of(context)?.settings.arguments;
+    // Resolved bilingual display text (Arabic under an Arabic locale when
+    // the Arabic variant exists, else the English text).
+    final displayName = productTextFor(context, product.name, product.nameAr);
+    final displayDescription = productTextFor(
+      context,
+      product.description,
+      product.descriptionAr,
+    );
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -121,7 +130,7 @@ class _ProductDetailsBody extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  product.name,
+                  displayName,
                   style: TextStyles.font24BlackBold,
                 ),
                 verticalSpace(8),
@@ -143,7 +152,13 @@ class _ProductDetailsBody extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12.r),
                         ),
                         child: Text(
-                          product.category,
+                          // The product's categoryAr, else the canonical
+                          // Arabic map label, else the English key.
+                          categoryDisplayFor(
+                            context,
+                            product.category,
+                            product.categoryAr,
+                          ),
                           style: TextStyles.font13GreenSemiBold,
                         ),
                       ),
@@ -175,7 +190,7 @@ class _ProductDetailsBody extends StatelessWidget {
                   ],
                 ),
                 verticalSpace(16),
-                if (product.description.isNotEmpty) ...[
+                if (displayDescription.trim().isNotEmpty) ...[
                   Text(
                     'Description',
                     style: TextStyles.font14DarkGrayRegular.copyWith(
@@ -184,7 +199,7 @@ class _ProductDetailsBody extends StatelessWidget {
                   ),
                   verticalSpace(8),
                   Text(
-                    product.description,
+                    displayDescription,
                     style: TextStyles.font14GrayRegular,
                   ),
                   verticalSpace(16),

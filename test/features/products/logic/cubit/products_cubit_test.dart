@@ -16,6 +16,7 @@ class MockProductCatalogDataSource extends Mock
 ProductDoc doc(
   String id, {
   String name = 'Shoes',
+  String? nameAr,
   String category = 'Fashion',
   double price = 99.5,
 }) =>
@@ -23,6 +24,7 @@ ProductDoc doc(
       id: id,
       product: ProductModel(
         name: name,
+        nameAr: nameAr,
         price: price,
         category: category,
         stock: 3,
@@ -178,6 +180,49 @@ void main() {
         predicate<ProductsEmpty>(
           (state) => state.searchQuery == 'zzz',
           'empty state carrying the search query',
+        ),
+      ],
+    );
+
+    blocTest<ProductsCubit, ProductsState>(
+      'search matches nameAr regardless of the current locale (bilingual)',
+      build: () => ProductsCubit(dataSource),
+      act: (cubit) async {
+        controller.add([
+          doc('p1', name: 'Espresso Machine', nameAr: 'آلة إسبريسو'),
+          doc('p2', name: 'Laptop'),
+        ]);
+        await Future<void>.delayed(Duration.zero);
+        cubit.search('إسبريسو');
+      },
+      expect: () => [
+        isA<ProductsLoaded>(),
+        predicate<ProductsLoaded>(
+          (state) =>
+              state.products.length == 1 && state.products.first.id == 'p1',
+          'the Arabic name matches even though the English name does not',
+        ),
+      ],
+    );
+
+    blocTest<ProductsCubit, ProductsState>(
+      'an English query still matches the English name of a product that '
+      'also carries nameAr',
+      build: () => ProductsCubit(dataSource),
+      act: (cubit) async {
+        controller.add([
+          doc('p1', name: 'Espresso Machine', nameAr: 'آلة إسبريسو'),
+          doc('p2', name: 'Laptop'),
+        ]);
+        await Future<void>.delayed(Duration.zero);
+        cubit.search('ESPRESSO');
+      },
+      expect: () => [
+        isA<ProductsLoaded>(),
+        predicate<ProductsLoaded>(
+          (state) =>
+              state.products.length == 1 && state.products.first.id == 'p1',
+          'English name matches for a product that has nameAr too',
         ),
       ],
     );

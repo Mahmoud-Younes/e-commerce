@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/di/dependency_injection.dart';
+import '../../../../core/helpers/product_localized_text.dart';
 import '../../../../core/models/cart_item_model.dart';
 import '../../../../core/models/product_model.dart';
 import '../../../../core/networking/api_result.dart';
@@ -63,7 +64,15 @@ class _AddToCartButtonState extends State<AddToCartButton> {
         uid,
         CartItemModel(
           productId: widget.productId,
-          name: widget.product.name,
+          // Purchase-time snapshot (PRD §4): the RESOLVED display name is
+          // captured here and flows through the cart line into the order
+          // item, so the historical order keeps the name the customer saw.
+          // CartItemModel itself carries no locale info — resolve now.
+          name: productTextFor(
+            context,
+            widget.product.name,
+            widget.product.nameAr,
+          ),
           price: widget.product.price,
           quantity: 1,
         ),

@@ -48,11 +48,16 @@ Future<void> setupGetIt() async {
 
   // login
   getIt.registerLazySingleton<LoginRepo>(() => LoginRepo());
-  getIt.registerFactory<LoginCubit>(() => LoginCubit(getIt()));
+  // LoginCubit gets FcmService so the token is saved right after login
+  // (review M1: PRD §6 push delivery, not just on relaunch).
+  getIt.registerFactory<LoginCubit>(() => LoginCubit(getIt(), getIt()));
 
   // register
   getIt.registerLazySingleton<RegisterRepo>(() => RegisterRepo());
-  getIt.registerFactory<RegisterCubit>(() => RegisterCubit());
+  // RegisterCubit gets FcmService so the token is saved right after the
+  // account is created (review M1: PRD §6 push delivery, not just on
+  // relaunch).
+  getIt.registerFactory<RegisterCubit>(() => RegisterCubit(getIt(), getIt()));
 
   // profile & logout & forgot password
   getIt.registerLazySingleton<ProfileRepo>(() => ProfileRepo());

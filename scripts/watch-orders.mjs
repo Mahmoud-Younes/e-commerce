@@ -19,6 +19,22 @@
  * lastNotifiedStatus; a transition already recorded there is skipped on
  * restart. On cold start the current statuses are recorded WITHOUT notifying,
  * so no history replay.
+ *
+ * Bounded catch-up (restart outage): if a checkpoint-known order's LIVE
+ * status differs from its last-notified status at cold start, the missed
+ * transition is notified exactly once (current status only — intermediate
+ * statuses crossed during the outage are not replayed; the checkpoint then
+ * moves to the live status). Orders created while the watcher was down are
+ * recorded silently: creation never pushes, so their baseline is correct.
+ *
+ * Liveness: `node scripts/watch-orders.mjs probe` (npm run probe) loads the
+ * service account, reaches Firestore once (15s budget) and exits 0, or logs
+ * probe FAIL and exits 1 — run it before a demo to prove the dependency.
+ *
+ * DEVICE SCENARIO: the first app launch shows the notification permission
+ * prompt — grant it. Denial does not block the in-app notification records
+ * (they come from Firestore), but pushes are silently dropped by the OS and
+ * the device looks dead while the watcher logs SENT; grant before demoing.
  */
 
 import fs from 'node:fs';
@@ -97,7 +113,41 @@ function collectFcmTokens(userData) {
   return [...new Set(tokens)];
 }
 
+// ================================ PROBE ====================================
+
+/** Probe verb: prove the watcher's dependencies are reachable, then exit. */
+async function probe() {
+  const PROBE_TIMEOUT_MS = 15_000;
+  try {
+    const account = loadServiceAccount();
+    log(TAG, `probe: service account ${account.path} (project ${account.projectId})`);
+
+    const result = await Promise.race([
+      (async () => {
+        initializeApp({ credential: cert(account.credentials) });
+        const db = getFirestore();
+        const ordersSnap = await db.collection('orders').limit(1).get();
+        const checkpoint = loadCheckpoint();
+        return { size: ordersSnap.size, checkpointSize: Object.keys(checkpoint).length };
+      })(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`no Firestore response within ${PROBE_TIMEOUT_MS / 1000}s`)), PROBE_TIMEOUT_MS),
+      ),
+    ]);
+
+    log(TAG, `probe OK: Firestore reachable (${result.size} order doc(s) sampled); checkpoint holds ${result.checkpointSize} order(s)`);
+  } catch (err) {
+    log(TAG, `probe FAIL: ${err?.message ?? err}`);
+    process.exit(1);
+  }
+}
+
 // ================================ MAIN =====================================
+
+if (process.argv[2] === 'probe') {
+  await probe();
+  process.exit(0);
+}
 
 function main() {
   const account = loadServiceAccount();
@@ -198,13 +248,32 @@ function main() {
   const unsubscribe = ordersRef.onSnapshot(
     (snapshot) => {
       if (!warm) {
-        // Cold start: record current statuses WITHOUT notifying (no replay).
+        // Cold start: record current statuses WITHOUT notifying for history —
+        // EXCEPT the bounded catch-up: a checkpoint-known order whose live
+        // status moved past its last-notified status missed a transition
+        // while the watcher was down; it is notified exactly once, for the
+        // current status only. Orders unknown to the checkpoint (created
+        // during the outage, or before the checkpoint existed) have no
+        // notified history to catch up from — creation never pushes, so
+        // recording them silently is their correct baseline.
         for (const doc of snapshot.docs) {
           const status = typeof doc.data()?.status === 'string' ? doc.data().status : null;
           lastStatuses.set(doc.id, status);
+
+          const notified = checkpoint[doc.id];
+          if (
+            typeof notified === 'string' &&
+            notified !== status &&
+            STATUS_BODIES[status]
+          ) {
+            log(TAG, `catch-up: ${doc.id} checkpointed as '${notified}' but live status is '${status}' (missed while watcher was down)`);
+            queue = queue
+              .then(() => processTransition(doc.id, doc.data() ?? {}, notified, status))
+              .catch((err) => log(TAG, `unhandled catch-up error for ${doc.id}: ${err?.message ?? err}`));
+          }
         }
         warm = true;
-        log(TAG, `cold start: recorded ${snapshot.size} existing order(s); no notifications sent for history`);
+        log(TAG, `cold start: recorded ${snapshot.size} existing order(s); no notifications for history, catch-up queued for checkpoint-known regressions/moves`);
         return;
       }
 

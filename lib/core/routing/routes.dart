@@ -28,4 +28,7 @@ class Routes {
   // Admin
   static const String adminDashboardScreen = '/adminDashboardScreen';
   static const String adminProductFormScreen = '/adminProductFormScreen';
+  static const String adminProducts = '/adminProducts';
+  static const String adminOrders = '/adminOrders';
+  static const String adminOrderDetails = '/adminOrderDetails';
 }

@@ -5,12 +5,12 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../../core/helpers/spacing.dart';
 import '../../../../core/models/cart_item_model.dart';
 import '../../../../core/networking/api_error_model.dart';
-import '../../../../core/routing/routes.dart';
 import '../../../../core/theming/colors.dart';
 import '../../../../core/theming/styles.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../logic/cubit/checkout_cubit.dart';
 import '../../logic/cubit/checkout_state.dart';
+import '../widgets/checkout_bloc_listener.dart';
 import '../widgets/checkout_form.dart';
 import '../widgets/checkout_items_list.dart';
 
@@ -38,21 +38,7 @@ class CheckoutScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Checkout')),
-      body: BlocListener<CheckoutCubit, CheckoutState>(
-        // Success only: errors are rendered inline by the builder below
-        // (full-screen error view with a Retry), so a dialog would duplicate.
-        listenWhen: (previous, current) => current is OrderSuccess,
-        listener: (context, state) {
-          state.whenOrNull(
-            orderSuccess: (orderId) {
-              Navigator.pushReplacementNamed(
-                context,
-                Routes.orderSuccessScreen,
-                arguments: orderId,
-              );
-            },
-          );
-        },
+      body: CheckoutBlocListener(
         child: BlocBuilder<CheckoutCubit, CheckoutState>(
           builder: (context, state) {
             return switch (state) {

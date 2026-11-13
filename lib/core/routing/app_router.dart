@@ -2,8 +2,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../features/admin/logic/cubit/admin_orders_cubit.dart';
+import '../../features/admin/logic/cubit/admin_products_cubit.dart';
 import '../../features/admin/ui/screens/admin_dashboard_screen.dart';
+import '../../features/admin/ui/screens/admin_order_details_screen.dart';
+import '../../features/admin/ui/screens/admin_orders_screen.dart';
 import '../../features/admin/ui/screens/admin_product_form_screen.dart';
+import '../../features/admin/ui/screens/admin_products_screen.dart';
 import '../../features/auth/logic/cubit/forgot_password_cubit.dart';
 import '../../features/auth/logic/cubit/login_cubit.dart';
 import '../../features/auth/logic/cubit/profile_cubit.dart';
@@ -15,6 +20,8 @@ import '../../features/auth/ui/screens/register_screen.dart';
 import '../di/dependency_injection.dart';
 import '../../features/cart/ui/screens/cart_screen.dart';
 import '../../features/catalog/ui/screens/home_screen.dart';
+import '../../features/products/logic/cubit/product_details_cubit.dart';
+import '../../features/products/logic/cubit/products_cubit.dart';
 import '../../features/products/ui/screens/product_details_screen.dart';
 import '../../features/products/ui/screens/products_screen.dart';
 import '../../features/checkout/logic/cubit/checkout_cubit.dart';
@@ -72,10 +79,25 @@ class AppRouter {
       case Routes.homeScreen:
         return MaterialPageRoute(builder: (_) => const HomeScreen());
       case Routes.productsScreen:
-        return MaterialPageRoute(builder: (_) => const ProductsScreen());
-      case Routes.productDetailsScreen:
+        // ProductsCubit subscribes to the live catalog stream in its
+        // constructor, so a plain factory provider is enough (the screen
+        // renders the initial-state spinner until the first snapshot).
         return MaterialPageRoute(
-            builder: (_) => const ProductDetailsScreen());
+          builder: (_) => BlocProvider(
+            create: (_) => getIt<ProductsCubit>(),
+            child: const ProductsScreen(),
+          ),
+        );
+      case Routes.productDetailsScreen:
+        // The screen reads the productId route argument in
+        // didChangeDependencies and calls loadProduct itself — no
+        // provider-side initialization needed.
+        return MaterialPageRoute(
+          builder: (_) => BlocProvider(
+            create: (_) => getIt<ProductDetailsCubit>(),
+            child: const ProductDetailsScreen(),
+          ),
+        );
       case Routes.favoritesScreen:
         return MaterialPageRoute(builder: (_) => const FavoritesScreen());
       case Routes.cartScreen:
@@ -128,6 +150,28 @@ class AppRouter {
       case Routes.adminProductFormScreen:
         return MaterialPageRoute(
             builder: (_) => const AdminProductFormScreen());
+      case Routes.adminProducts:
+        return MaterialPageRoute(
+          builder: (_) => BlocProvider(
+            create: (_) => getIt<AdminProductsCubit>(),
+            child: const AdminProductsScreen(),
+          ),
+        );
+      case Routes.adminOrders:
+        return MaterialPageRoute(
+          builder: (_) => BlocProvider(
+            create: (_) => getIt<AdminOrdersCubit>(),
+            child: const AdminOrdersScreen(),
+          ),
+        );
+      case Routes.adminOrderDetails:
+        final orderId = settings.arguments as String;
+        return MaterialPageRoute(
+          builder: (_) => BlocProvider(
+            create: (_) => getIt<AdminOrdersCubit>(),
+            child: AdminOrderDetailsScreen(orderId: orderId),
+          ),
+        );
       // =============== END AGENT C: CHECKOUT & ORDERS & ADMIN ================
 
       default:

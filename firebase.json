@@ -1,1 +1,17 @@
-{"flutter":{"platforms":{"dart":{"lib/firebase_options.dart":{"projectId":"sahety-ba784","configurations":{"web":"1:737811383840:web:f7461dea058fcdb1fd9e45"}}}}}}
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "flutter": {
+    "platforms": {
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "sahety-ba784",
+          "configurations": {
+            "web": "1:737811383840:web:f7461dea058fcdb1fd9e45"
+          }
+        }
+      }
+    }
+  }
+}

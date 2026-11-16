@@ -117,7 +117,7 @@ void main() {
 
       await tester.pumpWidget(app());
 
-      await tester.tap(find.byTooltip('Delete'));
+      await tester.tap(find.byTooltip('Delete Running Shoes'));
       await tester.pumpAndSettle();
 
       // Confirmation dialog is up; the cubit has NOT been called yet.
@@ -143,7 +143,7 @@ void main() {
 
       await tester.pumpWidget(app());
 
-      await tester.tap(find.byTooltip('Delete'));
+      await tester.tap(find.byTooltip('Delete Running Shoes'));
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
       await tester.pumpAndSettle();

@@ -40,6 +40,9 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
           Routes.adminProductFormScreen,
           // No arguments = create mode (ProductModel? contract).
         ),
+        // Semantic label so the e2e specs (and screen readers) can target
+        // the FAB by accessible name instead of coordinates.
+        tooltip: 'Add product',
         child: const Icon(Icons.add),
       ),
       body: BlocConsumer<AdminProductsCubit, AdminProductsState>(
@@ -203,12 +206,16 @@ class _ProductTile extends StatelessWidget {
           children: [
             IconButton(
               icon: const Icon(Icons.edit_outlined),
-              tooltip: 'Edit',
+              // Product-scoped accessible name (matches the cart
+              // stepper/remove tooltips): the e2e specs — and screen readers
+              // — target THIS row's buttons instead of any of the identical
+              // Edit/Delete actions across the list.
+              tooltip: 'Edit ${product.name}',
               onPressed: onEdit,
             ),
             IconButton(
               icon: const Icon(Icons.delete_outline, color: Color(0xFFD32F2F)),
-              tooltip: 'Delete',
+              tooltip: 'Delete ${product.name}',
               onPressed: onDelete,
             ),
           ],

@@ -1,13 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../../core/helpers/extensions.dart';
 import '../../../../core/helpers/spacing.dart';
 import '../../../../core/theming/styles.dart';
+import '../../../auth/logic/cubit/profile_cubit.dart';
 import '../admin_routes.dart';
 
 /// Admin hub (PRD §5). AuthGate (lib/e_commerce_app.dart) routes admins here
 /// from the role on their Firestore user doc.
+///
+/// The AppBar logout is the admin's only sign-out path — admins never see
+/// the customer Profile screen where the customer Logout button lives. It
+/// reuses [ProfileCubit.logout] (AuthGate swaps the tree once signOut
+/// completes); the router provides the cubit for this screen.
 ///
 /// Routes for the merge agent (see `../admin_routes.dart` for the full
 /// router snippets): pushes `adminProducts` (/adminProducts) and
@@ -20,6 +27,13 @@ class AdminDashboardScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text('Admin Dashboard', style: TextStyles.font18DarkGreenBold),
+        actions: [
+          IconButton(
+            tooltip: 'Logout',
+            icon: const Icon(Icons.logout),
+            onPressed: () => context.read<ProfileCubit>().logout(),
+          ),
+        ],
       ),
       body: Padding(
         padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 24.h),

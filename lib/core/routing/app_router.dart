@@ -146,7 +146,15 @@ class AppRouter {
           ),
         );
       case Routes.adminDashboardScreen:
-        return MaterialPageRoute(builder: (_) => const AdminDashboardScreen());
+        // ProfileCubit backs the AppBar logout (admins never see the
+        // customer Profile screen); its constructor has no side effects, so
+        // a plain factory provider is enough.
+        return MaterialPageRoute(
+          builder: (_) => BlocProvider(
+            create: (_) => getIt<ProfileCubit>(),
+            child: const AdminDashboardScreen(),
+          ),
+        );
       case Routes.adminProductFormScreen:
         return MaterialPageRoute(
             builder: (_) => const AdminProductFormScreen());

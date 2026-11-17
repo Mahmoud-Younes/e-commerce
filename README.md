@@ -213,23 +213,34 @@ Config lives in `e2e.config.ts` (Pixel 7 Pro emulator, bundle id `com.example.e_
 
 ## Screenshots
 
-> Placeholders — screenshots are not captured yet. Drop files under `docs/screenshots/` and replace the pending cells below.
+Captured on a Pixel 7 Pro emulator against the live Firebase project.
 
 | Screen | Screenshot |
 | --- | --- |
-| Login / Register | `docs/screenshots/login.png` _(pending)_ |
-| Home (catalog) | `docs/screenshots/home.png` _(pending)_ |
-| Product details | `docs/screenshots/product_details.png` _(pending)_ |
-| Products (search & filter) | `docs/screenshots/products.png` _(pending)_ |
-| Favorites | `docs/screenshots/favorites.png` _(pending)_ |
-| Cart | `docs/screenshots/cart.png` _(pending)_ |
-| Checkout (cash on delivery) | `docs/screenshots/checkout.png` _(pending)_ |
-| Order success | `docs/screenshots/order_success.png` _(pending)_ |
-| My Orders / Order details | `docs/screenshots/orders.png` _(pending)_ |
-| Notifications | `docs/screenshots/notifications.png` _(pending)_ |
-| Admin dashboard | `docs/screenshots/admin_dashboard.png` _(pending)_ |
-| Admin product form | `docs/screenshots/admin_product_form.png` _(pending)_ |
-| Admin orders | `docs/screenshots/admin_orders.png` _(pending)_ |
+| Login | <img src="docs/screenshots/login.png" width="240"> |
+| Home | <img src="docs/screenshots/home.png" width="240"> |
+| Products (search & filter) | <img src="docs/screenshots/products.png" width="240"> |
+| Product details | <img src="docs/screenshots/product_details.png" width="240"> |
+| Favorites | <img src="docs/screenshots/favorites.png" width="240"> |
+| Cart | <img src="docs/screenshots/cart.png" width="240"> |
+| Checkout (cash on delivery) | <img src="docs/screenshots/checkout.png" width="240"> |
+| Order success | <img src="docs/screenshots/order_success.png" width="240"> |
+
+Still pending:
+
+- **My Orders** and **Notifications** — their Firestore queries need composite
+  indexes (`orders`/`notifications`: `userId` ASC + `createdAt` ASC). Create
+  them once from the links Firestore itself reports in the app (it renders the
+  exact console URL in the error state), then re-capture.
+- **Admin dashboard / product form / orders** — the seeded demo admin
+  (`admin@sahety.app`, created by `scripts/bootstrap-admin.mjs`) has not been
+  bootstrapped in this Firebase project yet; add a service account and run
+  `npm run admin`, then log in and capture the three screens.
+
+> The demo catalog currently holds a few products seeded with empty names and
+> dead image URLs (the Supabase free tier had paused) — hence the placeholder
+> images and nameless cards above. Re-run `npm run seed` after restoring the
+> Supabase project for a full catalog.
 
 ## Notes
 

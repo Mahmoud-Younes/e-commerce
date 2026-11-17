@@ -38,12 +38,20 @@ class AppRouter {
   Route? generateRoute(RouteSettings settings) {
     // arguments can be passed to any screen like this ( arguments as ClassName )
     // and read back with `settings.arguments`.
+    //
+    // EVERY MaterialPageRoute below carries `settings: settings`: screens
+    // that read `ModalRoute.of(context)?.settings.arguments` (product
+    // details, order details, the admin product form) would otherwise see a
+    // fresh RouteSettings with the pushed arguments stripped, leaving them
+    // in their initial state forever (an empty details screen for every
+    // catalog card tap).
 
     switch (settings.name) {
       // ==================== AGENT A: AUTH & NOTIFICATIONS ====================
       // (edits inside this banner only)
       case Routes.loginScreen:
         return MaterialPageRoute(
+          settings: settings,
           builder: (_) => BlocProvider(
             create: (context) => getIt<LoginCubit>(),
             child: const LoginScreen(),
@@ -51,6 +59,7 @@ class AppRouter {
         );
       case Routes.registerScreen:
         return MaterialPageRoute(
+          settings: settings,
           builder: (_) => BlocProvider(
             create: (context) => getIt<RegisterCubit>(),
             child: const RegisterScreen(),
@@ -58,6 +67,7 @@ class AppRouter {
         );
       case Routes.forgotPasswordScreen:
         return MaterialPageRoute(
+          settings: settings,
           builder: (_) => BlocProvider(
             create: (context) => getIt<ForgotPasswordCubit>(),
             child: const ForgotPasswordScreen(),
@@ -65,24 +75,32 @@ class AppRouter {
         );
       case Routes.profileScreen:
         return MaterialPageRoute(
+          settings: settings,
           builder: (_) => BlocProvider(
             create: (context) => getIt<ProfileCubit>(),
             child: const ProfileScreen(),
           ),
         );
       case Routes.notificationsScreen:
-        return MaterialPageRoute(builder: (_) => const NotificationsScreen());
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const NotificationsScreen(),
+        );
       // ================== END AGENT A: AUTH & NOTIFICATIONS ==================
 
       // ================ AGENT B: CATALOG & FAVORITES & CART ==================
       // (edits inside this banner only)
       case Routes.homeScreen:
-        return MaterialPageRoute(builder: (_) => const HomeScreen());
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const HomeScreen(),
+        );
       case Routes.productsScreen:
         // ProductsCubit subscribes to the live catalog stream in its
         // constructor, so a plain factory provider is enough (the screen
         // renders the initial-state spinner until the first snapshot).
         return MaterialPageRoute(
+          settings: settings,
           builder: (_) => BlocProvider(
             create: (_) => getIt<ProductsCubit>(),
             child: const ProductsScreen(),
@@ -93,15 +111,22 @@ class AppRouter {
         // didChangeDependencies and calls loadProduct itself — no
         // provider-side initialization needed.
         return MaterialPageRoute(
+          settings: settings,
           builder: (_) => BlocProvider(
             create: (_) => getIt<ProductDetailsCubit>(),
             child: const ProductDetailsScreen(),
           ),
         );
       case Routes.favoritesScreen:
-        return MaterialPageRoute(builder: (_) => const FavoritesScreen());
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const FavoritesScreen(),
+        );
       case Routes.cartScreen:
-        return MaterialPageRoute(builder: (_) => const CartScreen());
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const CartScreen(),
+        );
       // ============== END AGENT B: CATALOG & FAVORITES & CART ================
 
       // ================= AGENT C: CHECKOUT & ORDERS & ADMIN ==================
@@ -115,6 +140,7 @@ class AppRouter {
         // bounce to login instead of silently proceeding.
         if (FirebaseAuth.instance.currentUser == null) {
           return MaterialPageRoute(
+            settings: settings,
             builder: (_) => BlocProvider(
               create: (context) => getIt<LoginCubit>(),
               child: const LoginScreen(),
@@ -122,6 +148,7 @@ class AppRouter {
           );
         }
         return MaterialPageRoute(
+          settings: settings,
           builder: (_) => BlocProvider(
             create: (_) => getIt<CheckoutCubit>(
               param1: settings.arguments as CheckoutArgs?,
@@ -130,9 +157,18 @@ class AppRouter {
           ),
         );
       case Routes.orderSuccessScreen:
-        return MaterialPageRoute(builder: (_) => const OrderSuccessScreen());
+        // The checkout bloc listener pushes the created order's ID — the
+        // success screen shows it in its copy ('Order #<id> — pay cash …').
+        final orderId = settings.arguments;
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => OrderSuccessScreen(
+            orderId: orderId is String ? orderId : '',
+          ),
+        );
       case Routes.myOrdersScreen:
         return MaterialPageRoute(
+          settings: settings,
           builder: (_) => BlocProvider(
             create: (_) => getIt<OrdersCubit>(),
             child: const MyOrdersScreen(),
@@ -140,6 +176,7 @@ class AppRouter {
         );
       case Routes.orderDetailsScreen:
         return MaterialPageRoute(
+          settings: settings,
           builder: (_) => BlocProvider(
             create: (_) => getIt<OrdersCubit>(),
             child: const OrderDetailsScreen(),
@@ -150,6 +187,7 @@ class AppRouter {
         // customer Profile screen); its constructor has no side effects, so
         // a plain factory provider is enough.
         return MaterialPageRoute(
+          settings: settings,
           builder: (_) => BlocProvider(
             create: (_) => getIt<ProfileCubit>(),
             child: const AdminDashboardScreen(),
@@ -157,9 +195,12 @@ class AppRouter {
         );
       case Routes.adminProductFormScreen:
         return MaterialPageRoute(
-            builder: (_) => const AdminProductFormScreen());
+          settings: settings,
+          builder: (_) => const AdminProductFormScreen(),
+        );
       case Routes.adminProducts:
         return MaterialPageRoute(
+          settings: settings,
           builder: (_) => BlocProvider(
             create: (_) => getIt<AdminProductsCubit>(),
             child: const AdminProductsScreen(),
@@ -167,6 +208,7 @@ class AppRouter {
         );
       case Routes.adminOrders:
         return MaterialPageRoute(
+          settings: settings,
           builder: (_) => BlocProvider(
             create: (_) => getIt<AdminOrdersCubit>(),
             child: const AdminOrdersScreen(),
@@ -175,6 +217,7 @@ class AppRouter {
       case Routes.adminOrderDetails:
         final orderId = settings.arguments as String;
         return MaterialPageRoute(
+          settings: settings,
           builder: (_) => BlocProvider(
             create: (_) => getIt<AdminOrdersCubit>(),
             child: AdminOrderDetailsScreen(orderId: orderId),

@@ -15,6 +15,13 @@ class HomeScreen extends StatelessWidget {
         title: const Text('Home'),
         actions: [
           IconButton(
+            // The in-app notification center's only entry point (PRD §6) —
+            // the screen exists and is routed, but nothing navigated to it.
+            icon: const Icon(Icons.notifications_outlined),
+            tooltip: 'Notifications',
+            onPressed: () => context.pushNamed(Routes.notificationsScreen),
+          ),
+          IconButton(
             icon: const Icon(Icons.favorite_border),
             tooltip: 'Favorites',
             onPressed: () => context.pushNamed(Routes.favoritesScreen),

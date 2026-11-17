@@ -100,7 +100,30 @@ class FcmService {
     // BEFORE `register()` is awaited — the token arrives on the stream once
     // registration completes (firebase_messaging 17+ has no direct `getToken`).
     _subscriptions.add(_msg.onRegistered.listen(_saveToken));
-    await _msg.register();
+    // register() fails when the platform plugin is degraded (disabled
+    // installation-ID API, missing Play services, …). Notifications are
+    // best-effort (PRD §6): the token path must never take the app down —
+    // report it and continue; the in-app notification center still works
+    // through its own Firestore stream, and the watcher's pushes are simply
+    // skipped for a device without a token.
+    try {
+      await _msg.register();
+    } catch (error, stack) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stack,
+          library: 'FcmService',
+          context: ErrorDescription('registering the FCM token'),
+          informationCollector: () => [
+            ErrorHint(
+              'FCM token registration failed — continuing without push; '
+              'the in-app notification center remains functional.',
+            ),
+          ],
+        ),
+      );
+    }
 
     // Foreground (PRD §6): record into the in-app center. The OS does not
     // show a system notification for foreground data messages; the center

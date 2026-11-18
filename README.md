@@ -213,34 +213,67 @@ Config lives in `e2e.config.ts` (Pixel 7 Pro emulator, bundle id `com.example.e_
 
 ## Screenshots
 
-Captured on a Pixel 7 Pro emulator against the live Firebase project.
+Captured on a Pixel 7 Pro emulator running in [demo mode](#demo-mode-local-emulator) against seeded dummy data.
+
+**Customer**
 
 | Screen | Screenshot |
 | --- | --- |
-| Login | <img src="docs/screenshots/login.png" width="240"> |
-| Home | <img src="docs/screenshots/home.png" width="240"> |
-| Products (search & filter) | <img src="docs/screenshots/products.png" width="240"> |
-| Product details | <img src="docs/screenshots/product_details.png" width="240"> |
-| Favorites | <img src="docs/screenshots/favorites.png" width="240"> |
-| Cart | <img src="docs/screenshots/cart.png" width="240"> |
-| Checkout (cash on delivery) | <img src="docs/screenshots/checkout.png" width="240"> |
-| Order success | <img src="docs/screenshots/order_success.png" width="240"> |
+| Login | <img src="docs/screenshots/login.png" width="220"> |
+| Home | <img src="docs/screenshots/home.png" width="220"> |
+| Products (search & filter) | <img src="docs/screenshots/products.png" width="220"> |
+| Product details | <img src="docs/screenshots/product_details.png" width="220"> |
+| Favorites | <img src="docs/screenshots/favorites.png" width="220"> |
+| Cart | <img src="docs/screenshots/cart.png" width="220"> |
+| Checkout (cash on delivery) | <img src="docs/screenshots/checkout.png" width="220"> |
+| Order success | <img src="docs/screenshots/order_success.png" width="220"> |
+| My Orders | <img src="docs/screenshots/orders.png" width="220"> |
+| Order details | <img src="docs/screenshots/order_details.png" width="220"> |
+| Notifications (in-app center) | <img src="docs/screenshots/notifications.png" width="220"> |
 
-Still pending:
+**Admin**
 
-- **My Orders** and **Notifications** — their Firestore queries need composite
-  indexes (`orders`/`notifications`: `userId` ASC + `createdAt` ASC). Create
-  them once from the links Firestore itself reports in the app (it renders the
-  exact console URL in the error state), then re-capture.
-- **Admin dashboard / product form / orders** — the seeded demo admin
-  (`admin@sahety.app`, created by `scripts/bootstrap-admin.mjs`) has not been
-  bootstrapped in this Firebase project yet; add a service account and run
-  `npm run admin`, then log in and capture the three screens.
+| Screen | Screenshot |
+| --- | --- |
+| Admin dashboard | <img src="docs/screenshots/admin_dashboard.png" width="220"> |
+| Product management (bilingual rows) | <img src="docs/screenshots/admin_products.png" width="220"> |
+| Product form (EN/AR inputs) | <img src="docs/screenshots/admin_product_form.png" width="220"> |
+| Incoming orders | <img src="docs/screenshots/admin_orders.png" width="220"> |
+| Order review + status flow | <img src="docs/screenshots/admin_order_details.png" width="220"> |
 
-> The demo catalog currently holds a few products seeded with empty names and
-> dead image URLs (the Supabase free tier had paused) — hence the placeholder
-> images and nameless cards above. Re-run `npm run seed` after restoring the
-> Supabase project for a full catalog.
+## Demo mode (local emulator)
+
+Run the whole app against a **local Firestore emulator seeded with dummy data** — a self-contained demo that never touches the live database, perfect for presentations:
+
+```bash
+# 1. start the local Firestore emulator (needs JDK 21+; Android Studio's JBR works)
+export JAVA_HOME="C:/Program Files/Android/Android Studio/jbr"
+export PATH="$JAVA_HOME/bin:$PATH"
+npx firebase emulators:start --project sahety-ba784 --only firestore --config=.demo-firebase.json
+
+# 2. seed dummy data into it (10 bilingual products, orders, notifications)
+node scripts/.demo-seed-emulator.mjs
+
+# 3. build + install the app in demo mode
+flutter build apk --debug --dart-define=DEMO_EMULATOR=true
+adb install -r build/app/outputs/flutter-apk/app-debug.apk
+```
+
+What demo mode does (`lib/main.dart`): Firestore reads/writes go to the local
+emulator at `10.0.2.2:8080`; **auth stays on the real project** (the demo
+accounts exist there); FCM registration is skipped. Everything resets when the
+emulator restarts — just re-run step 2.
+
+Demo credentials (both are demo-only accounts in the scratch Firebase project — never reuse these passwords anywhere real):
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Admin | `admin@sahety.app` | `Admin@123456` |
+| Customer | `demo.shopper@shop.test` | `Demo@1234` |
+
+`.demo-firebase.json` + `.demo-open.rules` are helper configs that start the
+emulator with open rules long enough for the seeder (the app itself runs under
+the project's real rules semantics).
 
 ## Notes
 

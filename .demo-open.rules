@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // TEMP local-emulator seeding rules — used only to load demo data into
+    // the LOCAL emulator (never deployed to the live project).
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

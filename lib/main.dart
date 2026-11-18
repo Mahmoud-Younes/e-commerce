@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -32,6 +33,19 @@ void main() async {
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // DEMO MODE (`--dart-define=DEMO_EMULATOR=true`): read/write Firestore
+  // from a LOCAL emulator (`npx firebase emulators:start --project
+  // sahety-ba784 --only firestore`) seeded with dummy data — a
+  // self-contained demo that never touches the live database. Auth stays on
+  // the real project (the demo accounts exist there); 10.0.2.2 is the host
+  // loopback as seen from an Android emulator.
+  const demoEmulator = bool.fromEnvironment('DEMO_EMULATOR');
+  if (demoEmulator) {
+    // Synchronous setup (returns void).
+    FirebaseFirestore.instance.useFirestoreEmulator('10.0.2.2', 8080);
+  }
+
   setupGetIt();
 
   // Supabase Storage (product images) — only with real config; skipped
@@ -51,6 +65,9 @@ void main() async {
   // (permission request, token save, message/tap streams). It runs AFTER
   // runApp so the terminated-state tap resolved inside initialize() finds a
   // live navigator; awaiting here cannot delay first paint anymore.
+  // Skipped in demo mode: push registration needs the live project.
   final fcm = getIt<FcmService>()..attachNavigator(appNavigatorKey);
-  await fcm.initialize();
+  if (!demoEmulator) {
+    await fcm.initialize();
+  }
 }

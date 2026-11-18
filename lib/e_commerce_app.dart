@@ -12,8 +12,10 @@ import 'core/theming/colors.dart';
 import 'features/admin/ui/screens/admin_dashboard_screen.dart';
 import 'features/auth/data/models/user_model.dart';
 import 'features/auth/logic/cubit/login_cubit.dart';
+import 'features/auth/logic/cubit/profile_cubit.dart';
 import 'features/auth/ui/screens/login_screen.dart';
 import 'features/catalog/ui/screens/home_screen.dart';
+import 'features/products/logic/cubit/products_cubit.dart';
 
 class ECommerceApp extends StatelessWidget {
   final AppRouter appRouter;
@@ -101,9 +103,18 @@ class AuthGate extends StatelessWidget {
             } else {
               userModel = UserModel.fromJson(doc.data()!);
             }
+            // AuthGate builds these screens DIRECTLY (bypassing
+            // generateRoute), so the cubits their widgets read must be
+            // provided here — the same wrappers the router cases use.
             return userModel.isAdmin
-                ? const AdminDashboardScreen()
-                : const HomeScreen();
+                ? BlocProvider(
+                    create: (_) => getIt<ProfileCubit>(),
+                    child: const AdminDashboardScreen(),
+                  )
+                : BlocProvider(
+                    create: (_) => getIt<ProductsCubit>(),
+                    child: const HomeScreen(),
+                  );
           },
         );
       },

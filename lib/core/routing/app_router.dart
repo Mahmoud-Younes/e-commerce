@@ -91,9 +91,14 @@ class AppRouter {
       // ================ AGENT B: CATALOG & FAVORITES & CART ==================
       // (edits inside this banner only)
       case Routes.homeScreen:
+        // Home previews the live catalog through its own ProductsCubit
+        // instance (same stream as the products screen, fresh filter state).
         return MaterialPageRoute(
           settings: settings,
-          builder: (_) => const HomeScreen(),
+          builder: (_) => BlocProvider(
+            create: (_) => getIt<ProductsCubit>(),
+            child: const HomeScreen(),
+          ),
         );
       case Routes.productsScreen:
         // ProductsCubit subscribes to the live catalog stream in its

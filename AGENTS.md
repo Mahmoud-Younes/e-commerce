@@ -21,7 +21,7 @@ E2E (Android only, final verification phase): build + install the APK first, the
 
 ## Layout & architecture
 
-Feature-first structure (mirrors the `doc_doc` reference project):
+Feature-first structure:
 
 - `lib/core/` — constants (incl. `firestore_paths.dart`), di, helpers, shared models (product/order/cart/notification), networking (`ApiResult`/error handler), repositories, routing, theming, widgets.
 - `lib/features/<feature>/{data,logic,ui}` — `data/` (repos + models), `logic/cubit/` (Cubit + freezed state), `ui/` (screens + widgets). Features: admin, auth, cart, catalog, checkout, favorites, notifications, orders, products.

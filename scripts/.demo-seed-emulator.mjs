@@ -9,6 +9,10 @@
  * touch. The emulator runs with open rules, so no auth header is needed.
  */
 const BASE = 'http://127.0.0.1:8080/v1/projects/sahety-ba784/databases/(default)';
+// Document names returned by the REST API already start with
+// "projects/<id>/databases/(default)", so DELETE goes under the /v1 root —
+// appending them to BASE would duplicate the path and 404 silently.
+const V1_ROOT = 'http://127.0.0.1:8080/v1';
 
 // Real prod-auth uids (accounts created via the public signup REST API).
 const ADMIN_UID = 'wwcVnxJmRiasb2pvBU70w3F2Nj02';
@@ -17,7 +21,10 @@ const CUSTOMER_UID = '9mTk0p6H0RgDkL60KR9WYkbTxv12';
 const get = (url) => fetch(url).then(r => r.json());
 const post = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
 const patchDoc = (url, body) => fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
-const del = (url) => fetch(url, { method: 'DELETE' }).then(r => r.status);
+const del = (url) => fetch(url, { method: 'DELETE' }).then(r => {
+  if (r.status < 200 || r.status >= 300) throw new Error(`DELETE ${url} -> ${r.status}`);
+  return r.status;
+});
 
 const s = (v) => ({ stringValue: v });
 const n = (v) => ({ doubleValue: v });
@@ -27,20 +34,33 @@ const ts = (ms) => ({ timestampValue: new Date(ms).toISOString() });
 const arr = (values) => ({ arrayValue: { values } });
 const map = (fields) => ({ mapValue: { fields } });
 
-const PRODUCTS = [
-  { slug: 'wireless-headphones', name: 'Wireless Headphones', nameAr: 'سماعات رأس لاسلكية', description: 'Over-ear Bluetooth headphones with noise cancellation and 30-hour battery life.', descriptionAr: 'سماعات بلوتوث فوق الأذن مع إلغاء الضوضاء وبطارية ٣٠ ساعة.', category: 'electronics', price: 2450, stock: 14 },
-  { slug: 'smart-watch', name: 'Smart Watch', nameAr: 'ساعة ذكية', description: 'Fitness tracking, heart-rate monitor and notifications on your wrist.', descriptionAr: 'تتبع اللياقة وقياس النبض والإشعارات على معصمك.', category: 'electronics', price: 3200, stock: 9 },
-  { slug: 'cotton-t-shirt', name: 'Cotton T-Shirt', nameAr: 'تيشيرت قطن', description: 'Soft 100% cotton tee, breathable and pre-shrunk.', descriptionAr: 'تيشيرت قطن ١٠٠٪ ناعم وجيد التهوية.', category: 'fashion', price: 320, stock: 40 },
-  { slug: 'running-sneakers', name: 'Running Sneakers', nameAr: 'حذاء رياضي للجري', description: 'Lightweight running shoes with cushioned soles for daily training.', descriptionAr: 'حذاء جري خفيف بنعل ممتص للصدمات.', category: 'fashion', price: 1450, stock: 22 },
-  { slug: 'led-desk-lamp', name: 'LED Desk Lamp', nameAr: 'مصباح مكتب LED', description: 'Dimmable LED desk lamp with USB charging port.', descriptionAr: 'مصباح مكتب LED قابل للتعتيم مع منفذ شحن USB.', category: 'home', price: 480, stock: 31 },
-  { slug: 'air-fryer', name: 'Air Fryer', nameAr: 'قلاية هوائية', description: '5.5L air fryer with 8 presets and rapid-air technology.', descriptionAr: 'قلاية هوائية ٥٫٥ لتر بـ ٨ برامج وتقنية الهواء السريع.', category: 'home', price: 3900, stock: 7 },
-  { slug: 'vitamin-c-serum', name: 'Vitamin C Face Serum', nameAr: 'سيروم فيتامين سي للوجه', description: 'Brightening vitamin C serum for a more even skin tone.', descriptionAr: 'سيروم فيتامين سي لتوحيد لون البشرة وإشراقتها.', category: 'beauty', price: 480, stock: 25 },
-  { slug: 'yoga-mat', name: 'Yoga Mat', nameAr: 'سجادة يوغا', description: 'Non-slip 6mm yoga mat with carrying strap.', descriptionAr: 'سجادة يوغا غير قابلة للانزلاق بسماكة ٦ مم.', category: 'sports', price: 420, stock: 18 },
-  { slug: 'arabic-coffee', name: 'Arabic Coffee 250g', nameAr: 'قهوة عربية ٢٥٠ جرام', description: 'Traditional Arabic coffee with cardamom, freshly roasted.', descriptionAr: 'قهوة عربية بالهيل محمصة طازجة.', category: 'groceries', price: 120, stock: 50 },
-  { slug: 'green-tea', name: 'Green Tea 100 Bags', nameAr: 'شاي أخضر ١٠٠ كيس', description: 'Natural green tea, 100 individually wrapped bags.', descriptionAr: 'شاي أخضر طبيعي ١٠٠ كيس مغلف فردياً.', category: 'groceries', price: 85, stock: 60 },
-];
+// Delete EVERY document in a collection — the REST list endpoint pages its
+// results (default 20/page), so a single pass leaves stale docs behind and
+// re-seeding produced duplicates on the Notifications screen.
+const wipeCollection = async (name) => {
+  for (let pass = 0; pass < 50; pass++) {
+    const page = await get(`${BASE}/documents/${name}?pageSize=100`);
+    const docs = page.documents || [];
+    if (docs.length === 0) return;
+    for (const d of docs) await del(`${V1_ROOT}/${d.name}`);
+  }
+  throw new Error(`wipe ${name}: did not empty after 50 passes`);
+};
 
-const image = (slug) => `https://picsum.photos/seed/${slug}/600/600`;
+// Image URLs are hand-picked so each product card shows a photo that matches
+// the product name (each one was visually verified before being listed here).
+const PRODUCTS = [
+  { slug: 'wireless-headphones', name: 'Wireless Headphones', nameAr: 'سماعات رأس لاسلكية', description: 'Over-ear Bluetooth headphones with noise cancellation and 30-hour battery life.', descriptionAr: 'سماعات بلوتوث فوق الأذن مع إلغاء الضوضاء وبطارية ٣٠ ساعة.', category: 'electronics', price: 2450, stock: 14, imageUrl: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&h=600&fit=crop&q=80' },
+  { slug: 'smart-watch', name: 'Smart Watch', nameAr: 'ساعة ذكية', description: 'Fitness tracking, heart-rate monitor and notifications on your wrist.', descriptionAr: 'تتبع اللياقة وقياس النبض والإشعارات على معصمك.', category: 'electronics', price: 3200, stock: 9, imageUrl: 'https://images.unsplash.com/photo-1579586337278-3befd40fd17a?w=600&h=600&fit=crop&q=80' },
+  { slug: 'cotton-t-shirt', name: 'Cotton T-Shirt', nameAr: 'تيشيرت قطن', description: 'Soft 100% cotton tee, breathable and pre-shrunk.', descriptionAr: 'تيشيرت قطن ١٠٠٪ ناعم وجيد التهوية.', category: 'fashion', price: 320, stock: 40, imageUrl: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600&h=600&fit=crop&q=80' },
+  { slug: 'running-sneakers', name: 'Running Sneakers', nameAr: 'حذاء رياضي للجري', description: 'Lightweight running shoes with cushioned soles for daily training.', descriptionAr: 'حذاء جري خفيف بنعل ممتص للصدمات.', category: 'fashion', price: 1450, stock: 22, imageUrl: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&h=600&fit=crop&q=80' },
+  { slug: 'led-desk-lamp', name: 'LED Desk Lamp', nameAr: 'مصباح مكتب LED', description: 'Dimmable LED desk lamp with USB charging port.', descriptionAr: 'مصباح مكتب LED قابل للتعتيم مع منفذ شحن USB.', category: 'home', price: 480, stock: 31, imageUrl: 'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=600&h=600&fit=crop&q=80' },
+  { slug: 'wireless-earbuds', name: 'Wireless Earbuds', nameAr: 'سماعات أذن لاسلكية', description: 'True wireless earbuds with a charging case and touch controls.', descriptionAr: 'سماعات لاسلكية بالكامل مع علبة شحن وتحكم باللمس.', category: 'electronics', price: 1250, stock: 35, imageUrl: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=600&h=600&fit=crop&q=80' },
+  { slug: 'vitamin-c-serum', name: 'Vitamin C Face Serum', nameAr: 'سيروم فيتامين سي للوجه', description: 'Brightening vitamin C serum for a more even skin tone.', descriptionAr: 'سيروم فيتامين سي لتوحيد لون البشرة وإشراقتها.', category: 'beauty', price: 480, stock: 25, imageUrl: 'https://images.unsplash.com/photo-1611080626919-7cf5a9dbab5b?w=600&h=600&fit=crop&q=80' },
+  { slug: 'yoga-mat', name: 'Yoga Mat', nameAr: 'سجادة يوغا', description: 'Non-slip 6mm yoga mat with carrying strap.', descriptionAr: 'سجادة يوغا غير قابلة للانزلاق بسماكة ٦ مم.', category: 'sports', price: 420, stock: 18, imageUrl: 'https://images.unsplash.com/photo-1592432678016-e910b452f9a2?w=600&h=600&fit=crop&q=80' },
+  { slug: 'arabic-coffee', name: 'Arabic Coffee 250g', nameAr: 'قهوة عربية ٢٥٠ جرام', description: 'Traditional Arabic coffee with cardamom, freshly roasted.', descriptionAr: 'قهوة عربية بالهيل محمصة طازجة.', category: 'groceries', price: 120, stock: 50, imageUrl: 'https://images.unsplash.com/photo-1447933601403-0c6688de566e?w=600&h=600&fit=crop&q=80' },
+  { slug: 'green-tea', name: 'Green Tea 100 Bags', nameAr: 'شاي أخضر ١٠٠ كيس', description: 'Natural green tea, 100 individually wrapped bags.', descriptionAr: 'شاي أخضر طبيعي ١٠٠ كيس مغلف فردياً.', category: 'groceries', price: 85, stock: 60, imageUrl: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=600&h=600&fit=crop&q=80' },
+];
 
 (async () => {
   // 1) user documents with roles (auth accounts live in the real project)
@@ -53,14 +73,13 @@ const image = (slug) => `https://picsum.photos/seed/${slug}/600/600`;
   console.log('user docs seeded');
 
   // 2) wipe + create products
-  const list = await get(`${BASE}/documents/products`);
-  for (const d of list.documents || []) await del(`${BASE}/${d.name}`);
+  await wipeCollection('products');
   for (const p of PRODUCTS) {
     const r = await patchDoc(`${BASE}/documents/products/seed_${p.slug}`, {
       fields: {
         name: s(p.name), nameAr: s(p.nameAr),
         description: s(p.description), descriptionAr: s(p.descriptionAr),
-        category: s(p.category), price: n(p.price), imageUrl: s(image(p.slug)),
+        category: s(p.category), price: n(p.price), imageUrl: s(p.imageUrl),
         stock: i(p.stock), isAvailable: b(true),
       },
     });
@@ -87,10 +106,8 @@ const image = (slug) => `https://picsum.photos/seed/${slug}/600/600`;
     },
   });
   // wipe previous orders/notifications (the local emulator keeps them between runs)
-  const oldOrders = await get(`${BASE}/documents/orders`);
-  for (const d of oldOrders.documents || []) await del(`${BASE}/${d.name}`);
-  const oldNotes = await get(`${BASE}/documents/notifications`);
-  for (const d of oldNotes.documents || []) await del(`${BASE}/${d.name}`);
+  await wipeCollection('orders');
+  await wipeCollection('notifications');
   const specs = [
     { key: 'groceries', doc: order([{ slug: 'green-tea', qty: 2 }, { slug: 'arabic-coffee', qty: 1 }], 6, 'delivered') },
     { key: 'headphones', doc: order([{ slug: 'wireless-headphones', qty: 1 }], 3, 'confirmed') },

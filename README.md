@@ -213,7 +213,7 @@ Config lives in `e2e.config.ts` (Pixel 7 Pro emulator, bundle id `com.example.e_
 
 ## Screenshots
 
-Captured on a Pixel 7 Pro emulator running in [demo mode](#demo-mode-local-emulator) against seeded dummy data.
+Captured on a Pixel 7 Pro emulator running in [demo mode](#demo-mode-local-emulator) against seeded dummy data. The demo catalog's product photos are hand-picked stock images that visually match each product name (verified one by one before being added to the seeder).
 
 **Customer**
 
@@ -251,7 +251,8 @@ export JAVA_HOME="C:/Program Files/Android/Android Studio/jbr"
 export PATH="$JAVA_HOME/bin:$PATH"
 npx firebase emulators:start --project sahety-ba784 --only firestore --config=.demo-firebase.json
 
-# 2. seed dummy data into it (10 bilingual products, orders, notifications)
+# 2. seed dummy data into it (10 bilingual products with matching photos,
+#    orders in mixed statuses, notifications)
 node scripts/.demo-seed-emulator.mjs
 
 # 3. build + install the app in demo mode
